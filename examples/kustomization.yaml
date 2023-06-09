@@ -3,5 +3,21 @@ kind: Kustomization
 resources:
 - configmap.yaml
 - component
-plugins:
-- uri: https://github.com/johnhoman/nop/plugins/annotate.star
+mutate:
+- uses: builtin.kustomize.k8s.io/prependNamePrefix
+  with:
+    namePrefix: foo-
+  selector: {}
+- uses: builtin.kustomize.k8s.io/patch
+  # in the case of a VirtualService, I need to add a prefix
+  # rule with /something/namespace/name and the destination
+  # name.namespace.svc.cluster.local
+  selector:
+    kinds:
+    - ConfigMap
+  with:
+    # I need to return this value to the given transform context,
+    # so just get the value from the field path, then pass it in
+    # to
+    fieldPath: data.BAR
+    value: poo

@@ -1,6 +1,12 @@
 package kustomize
 
-import "regexp"
+import (
+	"github.com/pkg/errors"
+	"net/url"
+	"os"
+	"regexp"
+	"strings"
+)
 
 type ReferenceType string
 
@@ -41,6 +47,48 @@ func ParseReferenceType(path string) ReferenceType {
 		return ReferenceTypeRemote
 	}
 	return ReferenceTypeLocal
+}
+
+type PathResolver interface {
+	Resolve(in string) (Path, error)
+}
+
+func Factory(cur Path, in string) (Path, error) {
+
+	switch ParseReferenceType(in) {
+	case ReferenceTypeRemoteGitHub:
+		// GitHub reference always get a new Path because they're external.
+
+		// Parse the resource path into a URL, then create
+		// the GitHub path from the resource
+		if !strings.HasPrefix(in, "https://") && strings.HasPrefix(in, "github.com") {
+			// url.Parse does weird things when a URL doesn't have a scheme.
+			in = "https://" + in
+		}
+		u, err := url.Parse(in)
+		if err != nil {
+			return nil, err
+		}
+
+		if u.Path[0] == '/' {
+			u.Path = u.Path[1:]
+		}
+
+		parts := strings.Split(u.Path, "/")
+		owner := parts[0]
+		repo := strings.TrimSuffix(parts[1], ".git")
+
+		path, err := NewGitHubPath(owner, repo, u.Query().Get("ref"), os.Getenv("GITHUB_TOKEN"))
+		if err != nil {
+			return nil, err
+		}
+		return path.Join(parts[2:]...), nil
+
+	case ReferenceTypeLocal:
+		return cur.Join(in), nil
+	default:
+		return nil, errors.New("can't resolve target: " + in)
+	}
 }
 
 var (

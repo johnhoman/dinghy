@@ -6,6 +6,7 @@ require (
 	github.com/alecthomas/kong v0.7.1
 	github.com/frankban/quicktest v1.14.5
 	github.com/google/go-github/v53 v53.0.0
+	github.com/jmespath/go-jmespath v0.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/afero v1.9.5
 	gopkg.in/yaml.v3 v3.0.1

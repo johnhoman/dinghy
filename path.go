@@ -174,12 +174,12 @@ func NewGitHubPathWithClient(owner, repo, ref, token string, client httpClient) 
 
 	req, err = newGithubRequest(ctx, u.String(), token)
 	if err != nil {
-		return nil, err
+		return nil, goerr.Join(ErrGitHubGetWorktree, err)
 	}
 
 	res, err = client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, goerr.Join(ErrGitHubGetWorktree, err)
 	}
 	defer func() {
 		if err = res.Body.Close(); err != nil {
@@ -189,9 +189,9 @@ func NewGitHubPathWithClient(owner, repo, ref, token string, client httpClient) 
 
 	switch res.StatusCode {
 	case http.StatusUnprocessableEntity:
-		err = os.ErrInvalid
+		return nil, os.ErrInvalid
 	case http.StatusNotFound:
-		err = os.ErrNotExist
+		return nil, os.ErrNotExist
 	default:
 		var body struct {
 			SHA       string               `json:"sha"`
@@ -205,7 +205,6 @@ func NewGitHubPathWithClient(owner, repo, ref, token string, client httpClient) 
 		if g.tree == nil {
 			g.tree = make(map[string]githubTreeListItem)
 		}
-		// TODO: index tree?
 		for _, item := range body.Tree {
 			if item.Type != "tree" && item.Type != "blob" {
 				panic("BUG: unrecognized tree item type: " + item.Type)
@@ -275,7 +274,7 @@ func (f *fsPath) WriteString(content string) error {
 }
 
 // Create opens a new file (or truncates an existing one) for writing and
-// creates an intermediate directories in the path.
+// creates any intermediate directories in the path.
 func (f *fsPath) Create() (io.Writer, error) {
 
 	parent := f.Join("..").(*fsPath)

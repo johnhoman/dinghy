@@ -3,3 +3,8 @@ kind: Kustomization
 resources:
 - service.yaml
 - https://github.com/johnhoman/nop.git/1
+mutate:
+- uses: builtin.kustomize.k8s.io/prependNamePrefix
+  with:
+    namePrefix: bar-
+  selector: {}
