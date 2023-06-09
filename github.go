@@ -18,14 +18,8 @@ var (
 	_ GithubFileInfo = &githubFileInfo{}
 )
 
-var (
-	ErrGitHubGetDefaultBranch = errors.New("failed to get default branch")
-	ErrGitHubGetCommit        = errors.New("failed to get commit for branch")
-	ErrGitHubNotAFile         = errors.New("the requested content is not a file")
-)
-
 // GitHub resolves references to upstream GitHub repos, downloads
-// kustomize files from the repo, and clones repos to a local cache
+// kustomize files from the repo, and clones repos to a local tree
 type GitHub interface {
 	GetDefaultBranch(ctx context.Context, owner, repo string) (string, error)
 	GetCommitSha(ctx context.Context, owner, repo, ref string) (string, error)
@@ -191,6 +185,9 @@ func (g *githubRepo) ListDir(ctx context.Context, path, ref string) ([]GithubFil
 }
 
 func (g *githubRepo) OpenFile(ctx context.Context, path, ref string) (io.Reader, error) {
+
+	// find the part directory and list the contents, then get the download link from there?
+
 	fc, dc, resp, err := g.gh.Repositories.GetContents(ctx, g.owner, g.repo, path, &gh.RepositoryContentGetOptions{
 		Ref: ref,
 	})

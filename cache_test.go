@@ -8,7 +8,7 @@ import (
 )
 
 func TestCacheDir(t *testing.T) {
-	environ := []string{"KUSTOMIZE_CACHE_DIR=/home/jhoman/.cache/kustomize"}
+	environ := []string{"KUSTOMIZE_CACHE_DIR=/home/jhoman/.tree/kustomize"}
 	path := cacheDir(afero.NewMemMapFs(), environ)
-	qt.Assert(t, path.String(), qt.Equals, "/home/jhoman/.cache/kustomize")
+	qt.Assert(t, path.String(), qt.Equals, "/home/jhoman/.tree/kustomize")
 }

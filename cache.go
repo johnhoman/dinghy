@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// CacheDir resolves the global cache directory, but it doesn't clean
+// CacheDir resolves the global tree directory, but it doesn't clean
 // up the directory
 func CacheDir() Path { return cacheDir(afero.NewOsFs(), os.Environ()) }
 

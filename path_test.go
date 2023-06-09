@@ -39,16 +39,18 @@ func TestGithubPath_Join(t *testing.T) {
 
 	const sha = "76b46f2ecc5c896217f5cb5a0bfdf3346365050b"
 
-	repo := NewGitHub("").Repo("johnhoman", "nop")
-	path := NewPathGitHub(repo, "", sha)
+	path, err := NewGitHubPath("johnhoman", "nop", sha, "")
+	qt.Assert(t, err, qt.IsNil)
 	path = path.Join("foo")
 	s := path.String()
 	qt.Assert(t, s, qt.Equals, "https://github.com/johnhoman/nop.git/foo?ref=76b46f2ecc5c896217f5cb5a0bfdf3346365050b")
 
-	path = NewPathGitHub(repo, "/foo", sha)
+	path, err = NewGitHubPath("johnhoman", "nop", sha, "")
+	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, path.Join("..").String(), qt.Equals, "https://github.com/johnhoman/nop.git?ref=76b46f2ecc5c896217f5cb5a0bfdf3346365050b")
 
-	path = NewPathGitHub(repo, "/foo", sha)
+	path, err = NewGitHubPath("johnhoman", "nop", sha, "")
+	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, path.Join("../..").String(), qt.Equals, "https://github.com/johnhoman/nop.git?ref=76b46f2ecc5c896217f5cb5a0bfdf3346365050b")
 }
 
@@ -80,8 +82,8 @@ func TestGithubPath_Exists(t *testing.T) {
 
 	for name, subtest := range cases {
 		t.Run(fmt.Sprintf("%s: %s", name, subtest.path), func(t *testing.T) {
-			repo := NewGitHub("").Repo("johnhoman", "nop")
-			path := NewPathGitHub(repo, "", sha)
+			path, err := NewGitHubPath("johnhoman", "nop", sha, "")
+			qt.Assert(t, err, qt.IsNil)
 			ok, err := path.Join(subtest.path).Exists()
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, ok, qt.Equals, subtest.want)
