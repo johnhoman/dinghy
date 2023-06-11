@@ -4,14 +4,14 @@ resources:
 - configmap.yaml
 - component
 mutate:
-- uses: builtin.kustomize.k8s.io/prependNamePrefix
+- uses: builtin.kustomize.k8s.io/name
   with:
-    namePrefix: foo-
-  selector: {}
+    prefix: foo-
+    suffix: -bar
+- uses: builtin.kustomize.k8s.io/namespace
+  with:
+    replace: foobar
 - uses: builtin.kustomize.k8s.io/patch
-  # in the case of a VirtualService, I need to add a prefix
-  # rule with /something/namespace/name and the destination
-  # name.namespace.svc.cluster.local
   selector:
     kinds:
     - ConfigMap

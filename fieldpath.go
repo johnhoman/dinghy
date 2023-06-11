@@ -1,228 +1,303 @@
 package kustomize
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"io"
+	"strconv"
 )
 
-type errFieldPathSyntax struct {
-	ch  byte
-	pos int
-}
-
-func (err *errFieldPathSyntax) Error() string {
-	return fmt.Sprintf("unexpected character: %q (pos %d)", string(err.ch), err.pos)
-}
-
-func newErrFieldPathSyntax(ch byte, pos int) error { return &errFieldPathSyntax{pos: pos, ch: ch} }
-
-type fieldPathTokenKind string
+type (
+	indexType string
+	queryOp   string
+)
 
 const (
-	fieldPathTokenKindField       fieldPathTokenKind = "string"
-	fieldPathTokenKindIndex       fieldPathTokenKind = "int"
-	fieldPathTokenKindFieldSelect fieldPathTokenKind = "select"
+	indexTypeQuery      indexType = "Query"
+	indexTypeMapKey     indexType = "MapKey"
+	indexTypeArrayIndex indexType = "ArrayIndex"
+
+	queryOpEq = "="
 )
 
-func newFieldPathTokenFromString(kind fieldPathTokenKind, s string) *fieldPathToken {
-	return &fieldPathToken{kind: kind, token: s}
-}
-
-func newFieldPathToken(kind fieldPathTokenKind, b ...byte) *fieldPathToken {
-	return newFieldPathTokenFromString(kind, string(b))
-}
-
-// fieldPathToken represents a field of a field path
-type fieldPathToken struct {
-	kind       fieldPathTokenKind
-	token      string
-	itemSelect fieldPathTokenSelect
-}
-
-type fieldPathTokenSelect struct {
-	field *fieldPathToken
-	value *fieldPathToken
-}
-
-func newFieldPathLexer(in string) *fieldPathLexer {
-	l := &fieldPathLexer{data: in}
-	l.readChar()
-	return l
-}
-
-// fieldPathLexer parses a field path parts into tokens
-type fieldPathLexer struct {
-	data         string
-	position     int
-	nextPosition int
-	ch           byte
-}
-
-// readChar sets the next character from the
-// provided string
-func (l *fieldPathLexer) readChar() {
-	if l.nextPosition >= len(l.data) {
-		l.ch = 0
-	} else {
-		l.ch = l.data[l.nextPosition]
-	}
-	// set the current position
-	l.position = l.nextPosition
-	// point to the next token
-	l.nextPosition += 1
-}
-
-func (l *fieldPathLexer) readWhen(pred func(byte) bool) string {
-	if l.position >= len(l.data) {
-		// EOF
-		return string(byte(0))
-	}
-	position := l.position
-
-	for pred(l.ch) {
-		l.readChar()
-	}
-	return l.data[position:l.position]
-}
-
-func (l *fieldPathLexer) readInt() string {
-	return l.readWhen(fieldPathIsNumber)
-}
-
-func (l *fieldPathLexer) readString() string {
-	return l.readWhen(fieldPathIsLetter)
-}
-
-// peekChar returns the next character, but doesn't
-// change the state of the lexer.
-func (l *fieldPathLexer) peekChar() byte {
-	if l.nextPosition >= len(l.data) {
-		return 0
-	}
-	return l.data[l.nextPosition]
-}
-
-func (l *fieldPathLexer) nextToken() (*fieldPathToken, error) {
-
-	var token *fieldPathToken
-
-	switch l.ch {
-	case '\'', '"':
-		var (
-			err  error
-			open = l.ch
-		)
-		l.readChar()
-		token, err = l.nextToken()
-		if err != nil {
-			return nil, err
-		}
-		// if the token in enclosed in quotes, then it
-		// should be a field, but integers will be read
-		// as integers in l.nextToken because it doesn't
-		// know about the quotes
-		token.kind = fieldPathTokenKindField
-		if l.ch != open {
-			return nil, errors.Wrapf(newErrFieldPathSyntax(l.ch, l.position), "expected %q", string(open))
-		}
-		l.readChar()
-	case ']':
-		return nil, newErrFieldPathSyntax(l.ch, l.position)
-	case '[':
-		// token can be a comparison, field or index.
-		l.readChar()
-		var err error
-		token, err = l.nextToken()
-		if err != nil {
-			return nil, err
-		}
-		// brackets can contain select statements for narrowing
-		// in on specific items in a map. If the next character
-		// is an '=', assume it's a select statement
-		if l.ch == '=' {
-			l.readChar()
-			pos := l.position
-			ch := l.ch
-			value, err := l.nextToken()
-			if err != nil {
-				return nil, err
-			}
-			if value.kind != fieldPathTokenKindField {
-				return nil, errors.Wrapf(
-					newErrFieldPathSyntax(ch, pos),
-					"expected %q, got %q",
-					fieldPathTokenKindField,
-					value.kind,
-				)
-			}
-			token.token = ""
-			token.kind = fieldPathTokenKindFieldSelect
-			token.itemSelect = fieldPathTokenSelect{
-				field: &fieldPathToken{
-					kind:  token.kind,
-					token: token.token,
-				},
-				value: &fieldPathToken{
-					kind:  value.kind,
-					token: value.token,
-				},
-			}
-		}
-		if l.ch != ']' {
-			return nil, errors.Wrapf(newErrFieldPathSyntax(l.ch, l.position), "expected %q", "]")
-		}
-		l.readChar()
-	case '.':
-		l.readChar()
-		pos := l.position
-		ch := l.ch
-		var err error
-		token, err = l.nextToken()
-		if err != nil {
-			return nil, err
-		}
-		if token.kind != fieldPathTokenKindField {
-			return nil, errors.Wrapf(
-				newErrFieldPathSyntax(ch, pos),
-				"got %s, want %s",
-				token.kind,
-				fieldPathTokenKindField,
-			)
-		}
-	case 0:
-		return nil, io.EOF
-	default:
-		switch {
-		case fieldPathIsNumber(l.ch):
-			token = newFieldPathTokenFromString(fieldPathTokenKindIndex, l.readInt())
-		case fieldPathIsLetter(l.ch):
-			token = newFieldPathTokenFromString(fieldPathTokenKindField, l.readString())
-		default:
-			return nil, newErrFieldPathSyntax(l.ch, l.position)
-		}
-	}
-	return token, nil
-}
-func (l *fieldPathLexer) parseTokens() ([]fieldPathToken, error) {
-	rv := make([]fieldPathToken, 0)
+func NewFieldPath(fieldPath string) (*FieldPath, error) {
+	indexes := make([]fieldPathIndex, 0)
+	parser := newFieldPathParser(fieldPath)
 	for {
-		token, err := l.nextToken()
+		index, err := parser.nextIndex()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return nil, err
 		}
-		rv = append(rv, *token)
+		indexes = append(indexes, index)
 	}
-	return rv, nil
+	return &FieldPath{
+		indexes:   indexes,
+		fieldPath: fieldPath,
+	}, nil
 }
 
-func fieldPathIsNumber(ch byte) bool {
+// FieldPath represents a path traversal sequence
+// of a yaml document. A FieldPath will support indexing,
+// both arrays and maps. It will also support indexing
+// arrays on field names and values of the map, such as
+// name="main". Field names that require using characters
+// that aren't alpha-numeric, such as on of /-. will need
+// to be enclosed in single or double quotes.
+//
+// Valid fieldPaths
+// ----------------
+// foo.bar
+// foo[example.com].baz
+// foo[example.com].baz
+// foo[0].com.baz
+// foo.bar[0].baz
+// foo['example.com/foo'].com.baz
+// foo[name=main].com.baz
+//
+// brackets are equivalent to
+//
+// There are only two types of indexing
+//  1. Comparison, which is only valid for an array type. Comparison
+//     is used for selecting a single map in an array of maps
+//  2. Fixed, which is an integer for an array or a string for a map.
+type FieldPath struct {
+	indexes   []fieldPathIndex
+	fieldPath string
+}
+
+func (fp *FieldPath) SetValue(m map[string]any, value any) error {
+	if len(fp.indexes) == 0 {
+		return nil
+	}
+
+	var current any = m
+	for k, index := range fp.indexes {
+		end := len(fp.indexes)-1 == k
+
+		switch index.indexType {
+		case indexTypeMapKey:
+			mapping, ok := current.(map[string]any)
+			if !ok {
+				return errors.Errorf("expected type `map[string]any{}`, got `%T`", current)
+			}
+			if end {
+				mapping[index.index] = value
+				return nil
+			}
+			// lookahead to the next element
+			next := fp.indexes[k+1]
+			v, ok := mapping[index.index]
+			if !ok {
+				// I might need to make this a slice depending
+				// on what the next type is
+				if next.indexType == indexTypeMapKey {
+					mapping[index.index] = make(map[string]any)
+				} else {
+					mapping[index.index] = make([]any, 0)
+				}
+				v = mapping[index.index]
+			}
+			// if the next element is an array, make sure it's big enough. We
+			// won't be able to change the size later because append
+			if it, ok := v.([]any); ok && next.indexType != indexTypeQuery {
+				rank, err := strconv.Atoi(next.index)
+				if err != nil {
+					return err
+				}
+				for rank >= len(it) {
+					it = append(it, nil)
+				}
+				mapping[index.index] = it
+				v = mapping[index.index]
+			}
+			current = v
+		case indexTypeArrayIndex, indexTypeQuery:
+			it, ok := current.([]any)
+			if !ok {
+				return errors.Errorf("expected type `[]any`, got `%T`", current)
+			}
+			if index.indexType == indexTypeArrayIndex {
+				rank, err := strconv.Atoi(index.index)
+				if err != nil {
+					return errors.Wrapf(err, "failed to convert index to int: %q", index.index)
+				}
+				if rank >= len(it) {
+					panic("Slice is too small")
+				}
+				for rank >= len(it) {
+					it = append(it, nil)
+				}
+				if end {
+					it[rank] = value
+					return nil
+				}
+				current = it[rank]
+			} else {
+				matchFound := false
+				for _, e := range it {
+					m, ok := e.(map[string]any)
+					if !ok {
+						return errors.Errorf("expected type map[string]any, got %T", current)
+					}
+					switch index.query.op {
+					case queryOpEq:
+						if v, ok := m[index.index]; ok && v == index.query.argument {
+							current = m
+							matchFound = true
+							break
+						}
+					default:
+						return errors.Errorf("unsupported query operation: %q", index.query.op)
+					}
+				}
+				if !matchFound {
+					query := index.index + string(index.query.op) + index.query.argument
+					return errors.Errorf("no match found for query: %q", query)
+				}
+			}
+		default:
+			panic("BUG: there are no other types")
+		}
+	}
+	return nil
+}
+
+type fieldPathIndexQuery struct {
+	op       queryOp
+	argument string
+}
+
+type fieldPathIndex struct {
+	indexType indexType
+	// index is either a map key (string) or a slice index (int). When the indexType
+	// is Query, then index will be the query key in a map.
+	index string
+
+	// query is only defined when the indexType is type Query
+	query fieldPathIndexQuery
+}
+
+func newFieldPathParser(fieldPath string) *fieldPathParser {
+	parser := &fieldPathParser{fieldPath: fieldPath}
+	parser.inc()
+	return parser
+}
+
+// fieldPathParser parses a fieldPath string
+// into indexes used for iterating on arbitrary json like
+// data structured
+type fieldPathParser struct {
+	fieldPath string
+	char      byte
+	pos       int
+	next      int
+}
+
+func (fp *fieldPathParser) inc() {
+	if fp.next >= len(fp.fieldPath) {
+		fp.char = 0
+	} else {
+		fp.char = fp.fieldPath[fp.next]
+	}
+	fp.pos = fp.next
+	fp.next += 1
+}
+
+func (fp *fieldPathParser) peek() byte {
+	if fp.pos >= len(fp.fieldPath) {
+		return 0
+	}
+	return fp.fieldPath[fp.next]
+}
+
+func (fp *fieldPathParser) nextIndex() (index fieldPathIndex, err error) {
+
+	switch fp.char {
+	case '\'', '"':
+		open := fp.char
+		fp.inc()
+		// quotes are used to parse non valid identifiers, e.g.
+		// 'eks.amazonaws.com/role-arn', so consume all characters
+		// until reaching the closing brace
+		pos := fp.pos
+		for fp.char != 0 && fp.char != open {
+			fp.inc()
+		}
+		// the character here should be the open character
+		if fp.char == 0 {
+			err = errors.Wrapf(io.EOF, "quote %q at pos %d is never closed", open, pos)
+			return
+		}
+		index = fieldPathIndex{indexType: indexTypeMapKey, index: fp.fieldPath[pos:fp.pos]}
+		fp.inc()
+		return
+	case '[':
+		// brackets should behave like a map index
+		pos := fp.pos
+		fp.inc()
+		index, err = fp.nextIndex()
+		if err != nil {
+			return
+		}
+		switch fp.char {
+		case '=':
+			fp.inc()
+			var next fieldPathIndex
+			next, err = fp.nextIndex()
+			if err != nil {
+				return
+			}
+			index.indexType = indexTypeQuery
+			index.query.op = queryOpEq
+			index.query.argument = next.index
+			fallthrough
+		case ']':
+			fp.inc()
+			return
+		default:
+			err = errors.Wrapf(io.EOF, "opening bracket was never closed: %q (pos %d)", "[", pos)
+			return
+		}
+	case '.':
+		fp.inc()
+		index, err = fp.nextIndex()
+		return
+	case 0:
+		err = io.EOF
+		return
+	default:
+		switch {
+		case isNumber(fp.char):
+			pos := fp.pos
+			for isNumber(fp.char) {
+				fp.inc()
+			}
+			index = fieldPathIndex{indexType: indexTypeArrayIndex, index: fp.fieldPath[pos:fp.pos]}
+			return
+		case isLetter(fp.char):
+			pos := fp.pos
+			for isAlpha(fp.char) {
+				fp.inc()
+			}
+			index = fieldPathIndex{indexType: indexTypeMapKey, index: fp.fieldPath[pos:fp.pos]}
+			return
+		default:
+			err = errors.Errorf("unexpected character: %q (pos %d)", fp.char, fp.pos)
+			return
+		}
+	}
+}
+
+func isNumber(ch byte) bool {
 	return '0' <= ch && ch <= '9'
 }
 
-func fieldPathIsLetter(ch byte) bool {
+func isLetter(ch byte) bool {
 	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z'
+}
+
+func isAlpha(ch byte) bool {
+	return isLetter(ch) || isNumber(ch)
 }

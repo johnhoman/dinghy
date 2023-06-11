@@ -42,7 +42,7 @@ type Renderer struct {
 // Build the provided Config into Kubernetes resource.
 func (r *Renderer) Build(rm ResourceMap) (ResourceMap, error) {
 
-	// TODO: maybe run this in a go routine using a channel so that
+	// TODO: maybe run this fieldPath a go routine using a channel so that
 	//   I can process/transform the results as they're created
 
 	// for now, just focus on local resources
@@ -63,7 +63,7 @@ func (r *Renderer) Build(rm ResourceMap) (ResourceMap, error) {
 			return nil, err
 		}
 		if ok {
-			// read in config
+			// read fieldPath config
 			c := &Config{}
 			f, err := path.Join("kustomization.yaml").Open()
 			if err != nil {
@@ -98,6 +98,8 @@ func (r *Renderer) Build(rm ResourceMap) (ResourceMap, error) {
 	}
 
 	for k, ms := range r.config.Mutations {
+		matcher := ms.Selector.Matcher()
+
 		if ms.Name == "" {
 			ms.Name = fmt.Sprintf("position %d", k)
 		}
@@ -125,7 +127,7 @@ func (r *Renderer) Build(rm ResourceMap) (ResourceMap, error) {
 		}
 
 		for _, obj := range rm {
-			if ms.Matches(obj) {
+			if matcher(obj) {
 				if err := m.mutator.Apply(obj, rm, typed); err != nil {
 					return nil, errors.Wrapf(ErrApplyMutator, "%q: %s", ms.Name, err)
 				}

@@ -11,10 +11,10 @@ import (
 type ReferenceType string
 
 const (
-	// ReferenceTypeLocal is a reference to a file in the current build
+	// ReferenceTypeLocal is a reference to a file fieldPath the current build
 	// path. If the current build path is a GitHub repo, this will be a
-	// file in the same GitHub repo. If the current build path if local,
-	// this will be a path in the local file system.
+	// file fieldPath the same GitHub repo. If the current build path if local,
+	// this will be a path fieldPath the local file system.
 	ReferenceTypeLocal ReferenceType = "Local"
 
 	// ReferenceTypeRemote is a reference to a build path outside the

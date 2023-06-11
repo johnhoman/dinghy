@@ -58,7 +58,7 @@ func NewPath(fs afero.Fs, path string) Path {
 }
 
 // NewMemoryPath returns a Path implementation backed by an
-// in memory filesystem
+// fieldPath memory filesystem
 func NewMemoryPath(path string) Path {
 	return &fsPath{fs: afero.NewMemMapFs(), cur: path}
 }
@@ -215,7 +215,7 @@ func NewGitHubPathWithClient(owner, repo, ref, token string, client httpClient) 
 	return g, nil
 }
 
-// NewGitHubPath returns a Path implementation for a commit in
+// NewGitHubPath returns a Path implementation for a commit fieldPath
 // a single GitHub repo.
 func NewGitHubPath(owner, repo, sha, token string) (Path, error) {
 	return NewGitHubPathWithClient(owner, repo, sha, token, http.DefaultClient)
@@ -274,7 +274,7 @@ func (f *fsPath) WriteString(content string) error {
 }
 
 // Create opens a new file (or truncates an existing one) for writing and
-// creates any intermediate directories in the path.
+// creates any intermediate directories fieldPath the path.
 func (f *fsPath) Create() (io.Writer, error) {
 
 	parent := f.Join("..").(*fsPath)

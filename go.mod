@@ -6,10 +6,10 @@ require (
 	github.com/alecthomas/kong v0.7.1
 	github.com/frankban/quicktest v1.14.5
 	github.com/google/go-github/v53 v53.0.0
-	github.com/jmespath/go-jmespath v0.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/afero v1.9.5
 	gopkg.in/yaml.v3 v3.0.1
+	k8s.io/api v0.27.2
 	k8s.io/apimachinery v0.27.2
 )
 
@@ -35,7 +35,6 @@ require (
 	golang.org/x/text v0.9.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect

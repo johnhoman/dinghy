@@ -29,42 +29,28 @@ func (fn MutatorFunc) Apply(obj *unstructured.Unstructured, rm ResourceMap, conf
 	return fn(obj, rm, config)
 }
 
-type mutatePrependNamePrefixConfig struct {
-	NamePrefix *string `yaml:"namePrefix"`
+type mutateNameConfig struct {
+	Prefix string `yaml:"Prefix"`
+	Suffix string `yaml:"Suffix"`
 }
 
-func (c *mutatePrependNamePrefixConfig) validate() error {
-	if c.NamePrefix == nil {
-		return errors.Errorf("missing required argument %q", "namePrefix")
-	}
+func (c *mutateNameConfig) validate() error {
 	return nil
 }
 
-type mutateAppendNameSuffixConfig struct {
-	NameSuffix *string `yaml:"nameSuffix"`
+type mutateNamespaceConfig struct {
+	Prefix  string  `yaml:"prefix"`
+	Suffix  string  `yaml:"suffix"`
+	Replace *string `yaml:"replace"`
 }
 
-func (c *mutateAppendNameSuffixConfig) validate() error {
-	if c.NameSuffix == nil {
-		return errors.Errorf("missing required argument %q", "nameSuffix")
-	}
-	return nil
-}
-
-type mutateReplaceNamespaceConfig struct {
-	Namespace *string `yaml:"namespace"`
-}
-
-func (c *mutateReplaceNamespaceConfig) validate() error {
-	if c.Namespace == nil {
-		return errors.Errorf("missing required argument %q", "namespace")
-	}
+func (c *mutateNamespaceConfig) validate() error {
 	return nil
 }
 
 type mutatePatchConfig struct {
 	FieldPath *string `yaml:"fieldPath"`
-	Value     *string `yaml:"value"`
+	Value     any     `yaml:"value"`
 }
 
 func (c *mutatePatchConfig) validate() error {
@@ -78,61 +64,50 @@ func (c *mutatePatchConfig) validate() error {
 }
 
 var (
-	mutatePrependNamePrefix = MutatorFunc(func(obj *unstructured.Unstructured, _ ResourceMap, config any) error {
-		c, ok := config.(*mutatePrependNamePrefixConfig)
+	mutateName = MutatorFunc(func(obj *unstructured.Unstructured, _ ResourceMap, config any) error {
+		c, ok := config.(*mutateNameConfig)
 		if !ok {
 			return ErrMutatorConfig
 		}
-		obj.SetName(*c.NamePrefix + obj.GetName())
+		obj.SetName(c.Prefix + obj.GetName() + c.Suffix)
 		return nil
 	})
 
-	mutateAppendNameSuffix = MutatorFunc(func(obj *unstructured.Unstructured, _ ResourceMap, config any) error {
-		c, ok := config.(*mutateAppendNameSuffixConfig)
+	mutateNamespace = MutatorFunc(func(obj *unstructured.Unstructured, _ ResourceMap, config any) error {
+		c, ok := config.(*mutateNamespaceConfig)
 		if !ok {
 			return ErrMutatorConfig
 		}
-		obj.SetName(obj.GetName() + *c.NameSuffix)
-		return nil
-	})
-
-	mutateReplaceNamespace = MutatorFunc(func(obj *unstructured.Unstructured, _ ResourceMap, config any) error {
-		c, ok := config.(*mutateReplaceNamespaceConfig)
-		if !ok {
-			return ErrMutatorConfig
+		namespace := obj.GetNamespace()
+		if c.Replace != nil {
+			namespace = *c.Replace
 		}
-		obj.SetNamespace(*c.Namespace)
+		obj.SetNamespace(c.Prefix + namespace + c.Suffix)
 		return nil
 	})
 
 	mutatePatch = MutatorFunc(func(obj *unstructured.Unstructured, _ ResourceMap, config any) error {
-		_, ok := config.(*mutatePatchConfig)
+		c, ok := config.(*mutatePatchConfig)
 		if !ok {
 			return ErrMutatorConfig
 		}
 
 		// You can't set a value with jmes path
-		m := obj.UnstructuredContent()
-		obj.SetUnstructuredContent(m)
-		return nil
+		fp, err := NewFieldPath(*c.FieldPath)
+		if err != nil {
+			return err
+		}
+		return fp.SetValue(obj.Object, c.Value)
 	})
 )
 
 func init() {
-	RegisterMutate("builtin.kustomize.k8s.io/prependNamePrefix", mutatePrependNamePrefix, func() any {
-		return &mutatePrependNamePrefixConfig{}
+	RegisterMutate("builtin.kustomize.k8s.io/name", mutateName, func() any {
+		return &mutateNameConfig{}
 	})
 
-	RegisterMutate("builtin.kustomize.k8s.io/appendNameSuffix", mutateAppendNameSuffix, func() any {
-		return &mutateAppendNameSuffixConfig{}
-	})
-
-	RegisterMutate("builtin.kustomize.k8s.io/replaceNamespace", mutateReplaceNamespace, func() any {
-		return &mutateReplaceNamespaceConfig{}
-	})
-
-	RegisterMutate("builtin.kustomize.k8s.io/replaceNamespace", mutateReplaceNamespace, func() any {
-		return &mutateReplaceNamespaceConfig{}
+	RegisterMutate("builtin.kustomize.k8s.io/namespace", mutateNamespace, func() any {
+		return &mutateNamespaceConfig{}
 	})
 
 	RegisterMutate("builtin.kustomize.k8s.io/patch", mutatePatch, func() any {

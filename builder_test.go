@@ -11,5 +11,5 @@ func TestRenderer_Render(t *testing.T) {
 	r := &Renderer{config: c, current: NewOsPath(".")}
 	rm, err := r.Build(nil)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, rm, qt.HasLen, 1)
+	qt.Assert(t, rm, qt.HasLen, 3)
 }

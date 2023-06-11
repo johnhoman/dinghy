@@ -2,129 +2,192 @@ package kustomize
 
 import (
 	qt "github.com/frankban/quicktest"
-	"io"
 	"testing"
 )
 
-func TestFieldPathLexer(t *testing.T) {
-	cases := map[string][]*fieldPathToken{
-		"data.FOO": {
-			{kind: fieldPathTokenKindField, token: "data"},
-			{kind: fieldPathTokenKindField, token: "FOO"},
+func TestFieldPath_SetValue(t *testing.T) {
+	cases := map[string]struct {
+		fieldPath string
+		value     any
+		in        map[string]any
+		out       map[string]any
+	}{
+		"SetsAValueInAMap": {
+			fieldPath: "data",
+			value:     "foo",
+			in:        make(map[string]any),
+			out: map[string]any{
+				"data": "foo",
+			},
 		},
-		"data[FOO]": {
-			{kind: fieldPathTokenKindField, token: "data"},
-			{kind: fieldPathTokenKindField, token: "FOO"},
-		},
-		"data['FOO']": {
-			{kind: fieldPathTokenKindField, token: "data"},
-			{kind: fieldPathTokenKindField, token: "FOO"},
-		},
-		`data["FOO"]`: {
-			{kind: fieldPathTokenKindField, token: "data"},
-			{kind: fieldPathTokenKindField, token: "FOO"},
-		},
-		`data["FOO"].bar`: {
-			{kind: fieldPathTokenKindField, token: "data"},
-			{kind: fieldPathTokenKindField, token: "FOO"},
-			{kind: fieldPathTokenKindField, token: "bar"},
-		},
-		`data["FOO"].bar[0]`: {
-			{kind: fieldPathTokenKindField, token: "data"},
-			{kind: fieldPathTokenKindField, token: "FOO"},
-			{kind: fieldPathTokenKindField, token: "bar"},
-			{kind: fieldPathTokenKindIndex, token: "0"},
-		},
-		`data[0].bar`: {
-			{kind: fieldPathTokenKindField, token: "data"},
-			{kind: fieldPathTokenKindIndex, token: "0"},
-			{kind: fieldPathTokenKindField, token: "bar"},
-		},
-		`data["0"].bar`: {
-			{kind: fieldPathTokenKindField, token: "data"},
-			{kind: fieldPathTokenKindField, token: "0"},
-			{kind: fieldPathTokenKindField, token: "bar"},
-		},
-		`data[name=bar].bar`: {
-			{kind: fieldPathTokenKindField, token: "data"},
-			{kind: fieldPathTokenKindFieldSelect, itemSelect: fieldPathTokenSelect{
-				field: &fieldPathToken{
-					kind:  fieldPathTokenKindField,
-					token: "name",
+		"CreatesAValueInAMap": {
+			fieldPath: "data",
+			value: map[string]any{
+				"data": map[string]any{
+					"foo": "bar",
 				},
-				value: &fieldPathToken{
-					kind:  fieldPathTokenKindField,
-					token: "bar",
+			},
+			in: make(map[string]any),
+			out: map[string]any{
+				"data": map[string]any{
+					"data": map[string]any{
+						"foo": "bar",
+					},
 				},
-			}},
-			{kind: fieldPathTokenKindField, token: "bar"},
+			},
 		},
-		`data[name="bar"].bar`: {
-			{kind: fieldPathTokenKindField, token: "data"},
-			{kind: fieldPathTokenKindFieldSelect, itemSelect: fieldPathTokenSelect{
-				field: &fieldPathToken{
-					kind:  fieldPathTokenKindField,
-					token: "name",
+		"SetsAValueInANestedList": {
+			fieldPath: "data[0]",
+			value: map[string]any{
+				"data": map[string]any{
+					"foo": "bar",
 				},
-				value: &fieldPathToken{
-					kind:  fieldPathTokenKindField,
-					token: "bar",
+			},
+			in: make(map[string]any),
+			out: map[string]any{
+				"data": []any{
+					map[string]any{
+						"data": map[string]any{
+							"foo": "bar",
+						},
+					},
 				},
-			}},
-			{kind: fieldPathTokenKindField, token: "bar"},
+			},
 		},
-		`data[name='bar'].bar`: {
-			{kind: fieldPathTokenKindField, token: "data"},
-			{kind: fieldPathTokenKindFieldSelect, itemSelect: fieldPathTokenSelect{
-				field: &fieldPathToken{
-					kind:  fieldPathTokenKindField,
-					token: "name",
+		"SetsAValueUsingAQuery": {
+			fieldPath: "data[name=main].foo",
+			value: map[string]any{
+				"data": map[string]any{
+					"foo": "bar",
 				},
-				value: &fieldPathToken{
-					kind:  fieldPathTokenKindField,
-					token: "bar",
+			},
+			in: map[string]any{
+				"data": []any{
+					map[string]any{
+						"name": "foo",
+					},
+					map[string]any{
+						"name": "main",
+					},
 				},
-			}},
-			{kind: fieldPathTokenKindField, token: "bar"},
+			},
+			out: map[string]any{
+				"data": []any{
+					map[string]any{
+						"name": "foo",
+					},
+					map[string]any{
+						"name": "main",
+						"foo": map[string]any{
+							"data": map[string]any{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
 		},
 	}
-	for fieldPath, tokens := range cases {
-		t.Run(fieldPath, func(t *testing.T) {
-			l := newFieldPathLexer(fieldPath)
-			for _, token := range tokens {
-				next, err := l.nextToken()
-				qt.Assert(t, err, qt.IsNil)
-				qt.Assert(t, next.kind, qt.Equals, token.kind)
-				qt.Assert(t, next.token, qt.Equals, token.token)
-			}
-			_, err := l.nextToken()
-			qt.Assert(t, err, qt.ErrorIs, io.EOF)
+
+	for name, testcase := range cases {
+		t.Run(name, func(t *testing.T) {
+			fp, err := NewFieldPath(testcase.fieldPath)
+			qt.Assert(t, err, qt.IsNil)
+			qt.Assert(t, fp.SetValue(testcase.in, testcase.value), qt.IsNil)
+			qt.Assert(t, testcase.in, qt.DeepEquals, testcase.out)
 		})
 	}
 }
 
-func TestFieldPathLexer_Error(t *testing.T) {
+func TestFieldPathParser(t *testing.T) {
 	cases := map[string]struct {
-		pos int
-		ch  byte
+		indexes []fieldPathIndex
 	}{
-		"data.FOO]":         {pos: 8, ch: ']'},
-		"data.[FOO":         {pos: 9, ch: 0}, // EOF
-		"data.0.bar":        {pos: 5, ch: '0'},
-		`data.["0].bar`:     {pos: 8, ch: ']'},  // expected "
-		`data.['0].bar`:     {pos: 8, ch: ']'},  // expected '
-		`data.[0'].bar`:     {pos: 7, ch: '\''}, // expected ]
-		`data.[0"].bar`:     {pos: 7, ch: '"'},
-		`data.[name=0].bar`: {pos: 11, ch: '0'},
+		`100`: {
+			indexes: []fieldPathIndex{
+				{indexType: indexTypeArrayIndex, index: "100"},
+			},
+		},
+		`data`: {
+			indexes: []fieldPathIndex{
+				{indexType: indexTypeMapKey, index: "data"},
+			},
+		},
+		`data.data`: {
+			indexes: []fieldPathIndex{
+				{indexType: indexTypeMapKey, index: "data"},
+				{indexType: indexTypeMapKey, index: "data"},
+			},
+		},
+		`data[data].data`: {
+			indexes: []fieldPathIndex{
+				{indexType: indexTypeMapKey, index: "data"},
+				{indexType: indexTypeMapKey, index: "data"},
+				{indexType: indexTypeMapKey, index: "data"},
+			},
+		},
+		`data['data.com/example']`: {
+			indexes: []fieldPathIndex{
+				{indexType: indexTypeMapKey, index: "data"},
+				{indexType: indexTypeMapKey, index: "data.com/example"},
+			},
+		},
+		`data[0].data`: {
+			indexes: []fieldPathIndex{
+				{indexType: indexTypeMapKey, index: "data"},
+				{indexType: indexTypeArrayIndex, index: "0"},
+				{indexType: indexTypeMapKey, index: "data"},
+			},
+		},
+		`data["0"].data`: {
+			indexes: []fieldPathIndex{
+				{indexType: indexTypeMapKey, index: "data"},
+				{indexType: indexTypeMapKey, index: "0"},
+				{indexType: indexTypeMapKey, index: "data"},
+			},
+		},
+		`data[name='main'].data`: {
+			indexes: []fieldPathIndex{
+				{indexType: indexTypeMapKey, index: "data"},
+				{indexType: indexTypeQuery, index: "name", query: fieldPathIndexQuery{
+					op:       queryOpEq,
+					argument: "main",
+				}},
+				{indexType: indexTypeMapKey, index: "data"},
+			},
+		},
+		`data[name=main].data`: {
+			indexes: []fieldPathIndex{
+				{indexType: indexTypeMapKey, index: "data"},
+				{indexType: indexTypeQuery, index: "name", query: fieldPathIndexQuery{
+					op:       queryOpEq,
+					argument: "main",
+				}},
+				{indexType: indexTypeMapKey, index: "data"},
+			},
+		},
+		`data[name="main"].data`: {
+			indexes: []fieldPathIndex{
+				{indexType: indexTypeMapKey, index: "data"},
+				{indexType: indexTypeQuery, index: "name", query: fieldPathIndexQuery{
+					op:       queryOpEq,
+					argument: "main",
+				}},
+				{indexType: indexTypeMapKey, index: "data"},
+			},
+		},
 	}
-	for fieldPath, subtest := range cases {
+	for fieldPath, testcase := range cases {
 		t.Run(fieldPath, func(t *testing.T) {
-			l := newFieldPathLexer(fieldPath)
-			_, err := l.parseTokens()
-			syntaxErr := &errFieldPathSyntax{}
-			qt.Assert(t, err, qt.ErrorAs, &syntaxErr)
-			qt.Assert(t, syntaxErr.pos, qt.Equals, subtest.pos)
-			qt.Assert(t, string(syntaxErr.ch), qt.Equals, string(subtest.ch))
+			parser := newFieldPathParser(fieldPath)
+			for _, index := range testcase.indexes {
+				next, err := parser.nextIndex()
+				qt.Assert(t, err, qt.IsNil)
+				qt.Assert(t, next.indexType, qt.DeepEquals, index.indexType)
+				qt.Assert(t, next.index, qt.DeepEquals, index.index)
+				qt.Assert(t, next.query.op, qt.DeepEquals, index.query.op)
+				qt.Assert(t, next.query.argument, qt.DeepEquals, index.query.argument)
+			}
 		})
 	}
 }

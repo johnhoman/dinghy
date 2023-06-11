@@ -4,7 +4,6 @@ resources:
 - service.yaml
 - https://github.com/johnhoman/nop.git/1
 mutate:
-- uses: builtin.kustomize.k8s.io/prependNamePrefix
+- uses: builtin.kustomize.k8s.io/name
   with:
-    namePrefix: bar-
-  selector: {}
+    prefix: bar-
