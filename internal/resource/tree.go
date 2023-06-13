@@ -2,12 +2,12 @@ package resource
 
 import (
 	goerr "errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/johnhoman/dinghy/internal/visitor"
 )
