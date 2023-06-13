@@ -19,7 +19,7 @@ var (
 	ErrPopResource      = errors.New("failed to pop resource from tree")
 )
 
-// treeNode stores resource in a hierarchy based on the resource
+// treeNode stores resources in a hierarchy based on the resource
 // group, version, kind, namespace, and name to more easily search
 // for resources on selection.
 type treeNode struct {
