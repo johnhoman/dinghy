@@ -1,9 +1,10 @@
 package codec
 
 import (
-	qt "github.com/frankban/quicktest"
 	"strings"
 	"testing"
+
+	qt "github.com/frankban/quicktest"
 )
 
 func TestYamlDecoder_DecodeErrMissingRequiredField(t *testing.T) {

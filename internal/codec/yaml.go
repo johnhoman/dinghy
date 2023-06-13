@@ -2,10 +2,11 @@ package codec
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"io"
 	"reflect"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 var (
