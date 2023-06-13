@@ -9,13 +9,13 @@ import (
 func TestYamlDecoder_DecodeErrMissingRequiredField(t *testing.T) {
 
 	type Bar struct {
-		Name string `yaml:"name" bespoke:"required"`
+		Name string `yaml:"name" dinghy:"required"`
 		Port int    `yaml:"port"`
 	}
 
 	type Foo struct {
-		Bar   int   `yaml:"bar" bespoke:"required"`
-		Baz   int   `yaml:"baz" bespoke:"required"`
+		Bar   int   `yaml:"bar" dinghy:"required"`
+		Baz   int   `yaml:"baz" dinghy:"required"`
 		Foo   *Foo  `yaml:"foo"`
 		Items []Bar `yaml:"items"`
 	}

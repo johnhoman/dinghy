@@ -12,6 +12,9 @@ var (
 	_ Decoder = &yamlDecoder{}
 )
 
+// YAMLDecoder parses only known YAML and checks for required fields.
+// Required fields are required because they are marked with the
+// tag `dinghy:"required"`.
 func YAMLDecoder(r io.Reader) Decoder {
 	d := yaml.NewDecoder(r)
 	d.KnownFields(true)
@@ -24,6 +27,7 @@ func (y *yamlDecoder) Decode(obj any) error {
 	if err := y.d.Decode(obj); err != nil {
 		return err
 	}
+
 	v := reflect.ValueOf(obj).Elem()
 	if reflect.TypeOf(v).Kind() != reflect.Struct {
 		return nil
@@ -31,8 +35,8 @@ func (y *yamlDecoder) Decode(obj any) error {
 	return checkRequired(v)
 }
 
-func parseBespoke(field reflect.StructField) map[string]empty {
-	bespoke, ok := field.Tag.Lookup("bespoke")
+func parseDinghyTag(field reflect.StructField) map[string]empty {
+	bespoke, ok := field.Tag.Lookup("dinghy")
 	if !ok {
 		return nil
 	}
@@ -44,8 +48,11 @@ func parseBespoke(field reflect.StructField) map[string]empty {
 	return tagSet
 }
 
+// isRequired checks a struct field required tags. If a struct
+// field is marked as required, isRequired returns true, otherwise
+// it returns false
 func isRequired(field reflect.StructField) bool {
-	if set := parseBespoke(field); set != nil {
+	if set := parseDinghyTag(field); set != nil {
 		_, ok := set["required"]
 		return ok
 	}
@@ -67,9 +74,12 @@ func checkRequired(v reflect.Value) error {
 				break
 			}
 		}
+
+		// If the field is required it needs to have a non-zero value
 		if isRequired(field) && v.FieldByName(field.Name).IsZero() {
 			return ErrRequiredField(name)
 		}
+
 		data := v.Field(k)
 		switch field.Type.Kind() {
 		case reflect.Ptr:
