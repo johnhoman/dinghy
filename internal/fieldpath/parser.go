@@ -1,10 +1,12 @@
 package dinghy
 
 import (
-	"github.com/pkg/errors"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
+// Parse the string representation into a FieldPath
 func Parse(fp string) (*FieldPath, error) {
 	return parseFieldPath(fp)
 }
@@ -17,7 +19,7 @@ func newParser(fieldPath string) *parser {
 
 // parser parses a fieldPath string
 // into indexes used for iterating on arbitrary json like
-// data structured
+// data structures
 type parser struct {
 	fieldPath string
 	char      byte
