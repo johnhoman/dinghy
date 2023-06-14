@@ -4,18 +4,18 @@ metadata:
   name: nginx-deployment
   labels:
     app: nginx
-    app.kubernetes.io/managed-by: bespoke.dev
+    app.kubernetes.io/managed-by: dinghy.dev
 spec:
   replicas: 10
   selector:
     matchLabels:
       app.kubernetes.io/name: nginx
-      app.kubernetes.io/part-of: testing.bespoke.dev
+      app.kubernetes.io/part-of: testing.dinghy.dev
   template:
     metadata:
       labels:
         app.kubernetes.io/name: nginx
-        app.kubernetes.io/part-of: testing.bespoke.dev
+        app.kubernetes.io/part-of: testing.dinghy.dev
     spec:
       containers:
         - name: nginx

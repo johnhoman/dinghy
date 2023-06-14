@@ -1,9 +1,9 @@
-apiVersion: bespoke.dev/v1alpha1
+apiVersion: dinghy.dev/v1alpha1
 kind: Config
 resources:
 - deployment.yaml
 mutate:
-- uses: builtin.bespoke.dev/jsonpatch
+- uses: builtin.dinghy.dev/jsonpatch
   with:
   - op: replace
     path: /spec/replicas

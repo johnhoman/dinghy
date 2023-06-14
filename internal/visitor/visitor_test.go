@@ -15,7 +15,7 @@ func TestVisitorFunc_Visit(t *testing.T) {
 	qt.Assert(t, visitor.Visit(got), qt.IsNil)
 	want := &unstructured.Unstructured{Object: map[string]any{
 		"metadata": map[string]any{
-			"annotations": map[string]string{
+			"annotations": map[string]any{
 				"foo": "bar",
 			},
 		},

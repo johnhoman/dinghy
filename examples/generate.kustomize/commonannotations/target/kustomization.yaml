@@ -4,5 +4,5 @@ resources:
 - service.yaml
 commonAnnotations:
   app.kubernetes.io/name: service
-  app.kubernetes.io/managed-by: bespoke.dev
-  app.kubernetes.io/part-of: testing.bespoke.dev
+  app.kubernetes.io/managed-by: dinghy.dev
+  app.kubernetes.io/part-of: testing.dinghy.dev

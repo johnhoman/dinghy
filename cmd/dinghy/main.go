@@ -10,7 +10,6 @@ import (
 
 var commandLine struct {
 	Build cmdBuild `kong:"cmd"`
-	Test  cmdTest  `kong:"cmd"`
 }
 
 func Main() {

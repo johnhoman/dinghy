@@ -56,12 +56,12 @@ func (y *yamlDecoder) Decode(obj any) error {
 }
 
 func parseDinghyTag(field reflect.StructField) map[string]empty {
-	bespoke, ok := field.Tag.Lookup("dinghy")
+	dinghy, ok := field.Tag.Lookup("dinghy")
 	if !ok {
 		return nil
 	}
 	tagSet := make(map[string]empty)
-	for _, tag := range strings.Split(bespoke, ",") {
+	for _, tag := range strings.Split(dinghy, ",") {
 		key := strings.TrimSpace(tag)
 		tagSet[key] = empty{}
 	}

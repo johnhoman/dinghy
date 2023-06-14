@@ -9,7 +9,7 @@ import (
 
 func TestReader_UnmarshalYAML(t *testing.T) {
 	type Foo struct {
-		Bar string `yaml:"bar" bespoke:"required"`
+		Bar string `yaml:"bar" dinghy:"required"`
 	}
 
 	t.Run("UnsetRequiredFieldsReturnsError", func(t *testing.T) {

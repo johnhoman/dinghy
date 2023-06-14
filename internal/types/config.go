@@ -6,7 +6,7 @@ import (
 
 const (
 	GroupName  = "dinghy.dev"
-	Version    = "v1beta1"
+	Version    = "v1alpha1"
 	ConfigKing = "Config"
 )
 
@@ -40,7 +40,7 @@ type PluginSpec struct {
 	// all resources will be selected.
 	Selector ResourceSelector `yaml:"selector"`
 	// Uses is the name or path to the plugin
-	Uses string `yaml:"uses" bespoke:"required"`
+	Uses string `yaml:"uses" dinghy:"required"`
 	With any    `yaml:"with"`
 }
 
@@ -50,8 +50,8 @@ type (
 )
 
 type Config struct {
-	APIVersion string `yaml:"apiVersion" bespoke:"required"`
-	Kind       string `yaml:"kind" bespoke:"required"`
+	APIVersion string `yaml:"apiVersion" dinghy:"required"`
+	Kind       string `yaml:"kind" dinghy:"required"`
 
 	Resources   []string         `yaml:"resources"`
 	Overlays    []string         `yaml:"overlays"`

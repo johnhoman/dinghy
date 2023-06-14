@@ -4,7 +4,7 @@ metadata:
   name: nginx-deployment
   annotations:
     app.kubernetes.io/name: nginx
-    app.kubernetes.io/part-of: testing.bespoke.dev
+    app.kubernetes.io/part-of: testing.dinghy.dev
   labels:
     app: nginx
 spec:

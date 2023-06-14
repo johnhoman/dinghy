@@ -60,6 +60,7 @@ func (d *dinghy) BuildFromConfig(c *types.Config, opts ...Option) (resource.Tree
 		use := m.Uses
 		if !mutate.Has(use) {
 			errs.Append(fmt.Errorf("mutator %q does not exist", use))
+			continue
 		}
 		_, newConfig, _ := mutate.Get(use)
 		// also check typed configs

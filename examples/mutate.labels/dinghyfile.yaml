@@ -3,7 +3,7 @@ kind: Config
 resources:
 - deployment.yaml
 mutate:
-- uses: builtin.bespoke.dev/labels
+- uses: builtin.dinghy.dev/labels
   with:
     app.kubernetes.io/name: nginx
-    app.kubernetes.io/part-of: testing.bespoke.dev
+    app.kubernetes.io/part-of: testing.dinghy.dev

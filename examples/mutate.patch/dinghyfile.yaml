@@ -1,21 +1,21 @@
-apiVersion: bespoke.dev/v1alpha1
+apiVersion: dinghy.dev/v1alpha1
 kind: Config
 resources:
 - deployment.yaml
 mutate:
-- uses: builtin.bespoke.dev/patch
+- uses: builtin.dinghy.dev/patch
   with:
     fieldPath: spec.replicas
     value: 10
-- uses: builtin.bespoke.dev/patch
+- uses: builtin.dinghy.dev/patch
   with:
     fieldPaths:
     - spec.template.metadata.labels
     - spec.selector.matchLabels
     value:
       app.kubernetes.io/name: nginx
-      app.kubernetes.io/part-of: testing.bespoke.dev
-- uses: builtin.bespoke.dev/patch
+      app.kubernetes.io/part-of: testing.dinghy.dev
+- uses: builtin.dinghy.dev/patch
   with:
     fieldPath: metadata.labels['app.kubernetes.io/managed-by']
-    value: bespoke.dev
+    value: dinghy.dev

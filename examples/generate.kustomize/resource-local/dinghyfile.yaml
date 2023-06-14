@@ -1,4 +1,4 @@
-apiVersion: bespoke.dev/v1alpha1
+apiVersion: dinghy.dev/v1alpha1
 kind: Config
 generate:
 - uses: builtin.dinghy.dev/kustomize
