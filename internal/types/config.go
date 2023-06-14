@@ -1,11 +1,7 @@
 package types
 
 import (
-	"k8s.io/apimachinery/pkg/labels"
 	"sort"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -21,33 +17,10 @@ type FieldRef struct {
 // ResourceSelector selects resources based on attributes of the resource,
 // such as labels, annotations.
 type ResourceSelector struct {
-	MatchLabels      map[string]string `yaml:"matchLabels"`
-	MatchAnnotations map[string]string `yaml:"matchAnnotations"`
-	MatchFields      []FieldRef        `yaml:"matchFields"`
-	Kinds            []string          `yaml:"kinds"`
-}
-
-func (s ResourceSelector) Matcher() func(obj *unstructured.Unstructured) bool {
-	kinds := sets.New[string](s.Kinds...)
-	matchLabels := labels.SelectorFromSet(s.MatchLabels)
-	matchAnnotations := labels.SelectorFromSet(s.MatchAnnotations)
-
-	return func(obj *unstructured.Unstructured) bool {
-		if kinds.Len() > 0 && !kinds.Has(obj.GetObjectKind().GroupVersionKind().Kind) {
-			return false
-		}
-		if !matchAnnotations.Empty() && !matchAnnotations.Matches(labels.Set(obj.GetAnnotations())) {
-			return false
-		}
-		if !matchLabels.Empty() && !matchLabels.Matches(labels.Set(obj.GetLabels())) {
-			return false
-		}
-		return true
-	}
-}
-
-func (s ResourceSelector) Matches(obj *unstructured.Unstructured) bool {
-	return false
+	MatchLabels map[string]string `yaml:"matchLabels"`
+	Kinds       []string          `yaml:"kinds"`
+	Names       []string          `yaml:"names"`
+	Namespaces  []string          `yaml:"namespaces"`
 }
 
 // GeneratorSpec is a spec for resource generation rules.
@@ -55,7 +28,7 @@ type GeneratorSpec struct {
 	// Name is a unique name for the mutation
 	Name string `yaml:"name"`
 	// Uses is the name or path to the plugin
-	Uses string `yaml:"uses"`
+	Uses string `yaml:"uses" dinghy:"required"`
 	With any    `yaml:"with"`
 }
 
@@ -76,19 +49,12 @@ type (
 	ValidationSpec = PluginSpec
 )
 
-func (m PluginSpec) Matches(obj *unstructured.Unstructured) bool {
-	return m.Selector.Matches(obj)
-}
-
-func (m PluginSpec) Matcher() func(obj *unstructured.Unstructured) bool {
-	return m.Selector.Matcher()
-}
-
 type Config struct {
 	APIVersion string `yaml:"apiVersion" bespoke:"required"`
 	Kind       string `yaml:"kind" bespoke:"required"`
 
 	Resources   []string         `yaml:"resources"`
+	Overlays    []string         `yaml:"overlays"`
 	Generators  []GeneratorSpec  `yaml:"generate"`
 	Mutations   []MutationSpec   `yaml:"mutate"`
 	Validations []ValidationSpec `yaml:"validate"`

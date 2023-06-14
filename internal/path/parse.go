@@ -8,6 +8,16 @@ import (
 	"strings"
 )
 
+type Option func(o *options)
+
+// WithRelativeRoot gives the parser a root as a base for relative paths,
+// so that they can be resolved to absolute paths
+func WithRelativeRoot(root Path) Option {
+	return func(o *options) {
+		o.root = root
+	}
+}
+
 // PreparePath does any path initialization required, such as syncing
 // the GitHub path worktree cache, or pulling s3 credentials from the
 // host
@@ -17,7 +27,9 @@ func PreparePath(path Path) error {
 
 // Parse parses the provided path and returns the path object
 // most closely aligned with the path.
-func Parse(in string) (Path, error) {
+func Parse(in string, opts ...Option) (Path, error) {
+	o := newOptions(opts...)
+
 	switch {
 	case git.MatchString(in):
 		u, err := url.Parse(requireSecure(in))
@@ -35,7 +47,11 @@ func Parse(in string) (Path, error) {
 	case remote.MatchString(in):
 		panic("remote-path: not implemented")
 	}
-	return NewFSPath(afero.NewOsFs(), in), nil
+	if err := PreparePath(o.root); err != nil {
+		return nil, err
+	}
+	p := o.root.Join(in)
+	return p, PreparePath(p)
 }
 
 func requireSecure(in string) string {
@@ -62,3 +78,22 @@ var (
 	s3     = regexp.MustCompile(`^s3:\/\/[-a-z0-9@:%._\+~#=]{1,256}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)$`)
 	remote = regexp.MustCompile(`^https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)$`)
 )
+
+func newOptions(opts ...Option) *options {
+	o := &options{
+		root: NewFSPath(afero.NewOsFs(), ""),
+	}
+	for _, f := range opts {
+		f(o)
+	}
+	return o
+}
+
+type options struct {
+	// root is the root of an existing file system to consider
+	// when parsing a path. Any relative paths should be resolved
+	// to their full path, so when parsing relative paths that don't
+	// match on any full paths, it should be considered relative to
+	// this path. If the path is not provided
+	root Path
+}

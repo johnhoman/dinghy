@@ -28,3 +28,7 @@ func (chain Chain) Visit(obj *unstructured.Unstructured) error {
 	}
 	return nil
 }
+
+func Visit(visitor Visitor, m map[string]any) error {
+	return visitor.Visit(&unstructured.Unstructured{Object: m})
+}

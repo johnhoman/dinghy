@@ -6,45 +6,34 @@ import (
 	"strings"
 )
 
-func newResourceKey(obj *unstructured.Unstructured) resourceKey {
-	key := resourceKey{
-		kind:       obj.GroupVersionKind().Kind,
-		apiVersion: obj.GroupVersionKind().GroupVersion().String(),
-		name:       obj.GetName(),
-		namespace:  obj.GetNamespace(),
+func newResourceKey(obj *unstructured.Unstructured) Key {
+	gvk := obj.GroupVersionKind()
+	key := Key{
+		Kind:         gvk.Kind,
+		GroupVersion: obj.GroupVersionKind().GroupVersion().String(),
+		Name:         obj.GetName(),
+		Namespace:    obj.GetNamespace(),
 	}
 	return key
 }
 
-// resourceKey is a unique identifier for a resource.
-type resourceKey struct {
-	apiVersion string
-	kind       string
-	name       string
-	namespace  string
+// Key is a unique identifier for a resource.
+type Key struct {
+	GroupVersion string
+	Kind         string
+	Name         string
+	Namespace    string
 }
 
-func (r resourceKey) String() string {
-	s := strings.ReplaceAll(r.apiVersion, "/", ".")
-	s = fmt.Sprintf("%s.%s", s, r.kind)
-	if r.namespace != "" {
-		s = s + "/" + r.namespace
+func (r Key) String() string {
+	s := strings.ReplaceAll(r.GroupVersion, "/", ".")
+	s = fmt.Sprintf("%s.%s", s, r.Kind)
+	if r.Namespace != "" {
+		s = s + "/" + r.Namespace
 	}
-	return s + "/" + r.name
+	return s + "/" + r.Name
 }
 
-func (r resourceKey) GetName() string {
-	return r.name
-}
-
-func (r resourceKey) GetNamespace() string {
-	return r.namespace
-}
-
-func (r resourceKey) Kind() string {
-	return r.kind
-}
-
-func (r resourceKey) GroupVersion() string {
-	return r.apiVersion
+func Wrap(m map[string]any) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: m}
 }

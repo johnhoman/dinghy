@@ -1,0 +1,16 @@
+apiVersion: dinghy.dev/v1alpha1
+kind: Config
+mutate:
+- uses: builtin.dinghy.dev/metadata/annotations
+  with:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/part-of: testing.dinghy.dev
+- uses: builtin.dinghy.dev/script/js
+  with:
+    script: |
+      function mutate(o, c) {
+        o.metadata.annotations["dinghy.dev/script"] = `Hello, ${c.params.name}!`
+      }
+    config:
+      params:
+        name: World

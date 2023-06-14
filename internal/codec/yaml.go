@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -13,13 +14,31 @@ var (
 	_ Decoder = &yamlDecoder{}
 )
 
+func YAMLCopyTo(to, from any) error {
+	buf := new(bytes.Buffer)
+	if err := YAMLEncoder(buf).Encode(from); err != nil {
+		return err
+	}
+	d := YAMLDecoder(buf)
+	if reflect.TypeOf(to).Kind() != reflect.Pointer {
+		return d.Decode(&to)
+	}
+	return d.Decode(to)
+}
+
 // YAMLDecoder parses only known YAML and checks for required fields.
-// Required fields are required because they are marked with the
+// Required fields are required when they are marked with the
 // tag `dinghy:"required"`.
 func YAMLDecoder(r io.Reader) Decoder {
 	d := yaml.NewDecoder(r)
 	d.KnownFields(true)
 	return &yamlDecoder{d: d}
+}
+
+func YAMLEncoder(w io.Writer) Encoder {
+	e := yaml.NewEncoder(w)
+	e.SetIndent(2)
+	return e
 }
 
 type yamlDecoder struct{ d *yaml.Decoder }

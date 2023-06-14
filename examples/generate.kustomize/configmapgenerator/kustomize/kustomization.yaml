@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+configMapGenerator:
+- name: configs
+  files: [ a.json ]
+  literals:
+    - port=8080
+  envs:
+    - properties.env
+  options:
+    disableNameSuffixHash: true

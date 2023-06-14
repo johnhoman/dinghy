@@ -1,0 +1,9 @@
+apiVersion: bespoke.dev/v1alpha1
+kind: Config
+resources:
+- deployment.yaml
+mutate:
+- uses: builtin.bespoke.dev/name
+  with:
+    prefix: "foo-"
+    suffix: "-bar"

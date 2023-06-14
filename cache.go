@@ -1,4 +1,4 @@
-package kustomize
+package dinghy
 
 import (
 	"github.com/spf13/afero"
@@ -16,10 +16,10 @@ func cacheDir(fs afero.Fs, environ []string) Path {
 		environ = os.Environ()
 	}
 	for _, env := range environ {
-		if strings.HasPrefix(env, "KUSTOMIZE_CACHE_DIR=") {
-			cd := strings.TrimPrefix(env, "KUSTOMIZE_CACHE_DIR=")
+		if strings.HasPrefix(env, "BESPOKE_CACHE_DIR=") {
+			cd := strings.TrimPrefix(env, "BESPOKE_CACHE_DIR=")
 			return NewPath(fs, cd)
 		}
 	}
-	return NewPath(fs, filepath.Join(os.TempDir(), "kustomize"))
+	return NewPath(fs, filepath.Join(os.TempDir(), "bespoke"))
 }

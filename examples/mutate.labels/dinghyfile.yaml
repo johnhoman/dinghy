@@ -1,0 +1,9 @@
+apiVersion: dinghy.dev/v1alpha1
+kind: Config
+resources:
+- deployment.yaml
+mutate:
+- uses: builtin.bespoke.dev/labels
+  with:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/part-of: testing.bespoke.dev

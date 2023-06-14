@@ -1,5 +1,7 @@
 package mutate
 
+import "github.com/johnhoman/dinghy/internal/visitor"
+
 type NewConfigFunc func() any
 
 func newAnyMap() any {
@@ -16,6 +18,15 @@ func newAnySlice() any {
 
 func newConfig[T any]() NewConfigFunc {
 	return func() any {
-		return new(T)
+		t := new(T)
+		return t
 	}
+}
+
+func newNamespaceConfig() any {
+	return &visitor.NamespaceConfig{}
+}
+
+func newNameConfig() any {
+	return &visitor.NameConfig{}
 }

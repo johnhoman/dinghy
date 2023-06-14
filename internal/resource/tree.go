@@ -2,6 +2,7 @@ package resource
 
 import (
 	goerr "errors"
+	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -20,7 +21,7 @@ var (
 )
 
 // treeNode stores resources in a hierarchy based on the resource
-// group, version, kind, namespace, and name to more easily search
+// group, version, Kind, Namespace, and Name to more easily search
 // for resources on selection.
 type treeNode struct {
 	nodes map[string]*treeNode
@@ -52,7 +53,9 @@ func (tree *treeNode) Visit(visitor visitor.Visitor, opts ...MatchOption) error 
 		for namespace := range o.namespaces {
 			for name := range o.names {
 				path := []string{gvk.Group, gvk.Version, gvk.Kind, namespace, name}
-				appendError(&errs, tree.visit(visitor, path...))
+				if err := tree.visit(visitor, path...); err != nil {
+					errs = append(errs, err)
+				}
 			}
 		}
 	}
@@ -63,11 +66,11 @@ func (tree *treeNode) Visit(visitor visitor.Visitor, opts ...MatchOption) error 
 }
 
 func (tree *treeNode) path(key Key) []string {
-	gv, err := schema.ParseGroupVersion(key.GroupVersion())
+	gv, err := schema.ParseGroupVersion(key.GroupVersion)
 	if err != nil {
 		panic(err)
 	}
-	return []string{gv.Group, gv.Version, key.Kind(), key.GetNamespace(), key.GetName()}
+	return []string{gv.Group, gv.Version, key.Kind, key.Namespace, key.Name}
 }
 
 // Insert a resource into the treeNode. If a resource already exists in the tree
@@ -81,13 +84,15 @@ func (tree *treeNode) Insert(obj *unstructured.Unstructured) error {
 // doesn't exist, ErrNotFound will be returned
 func (tree *treeNode) Pop(key Key) (*unstructured.Unstructured, error) {
 	obj, err := tree.pop(tree.path(key)...)
-	return obj, errors.Wrapf(err, "%s: %s", ErrPopResource, treeError(obj))
+	return obj, errors.Wrapf(err, "%s: %s", ErrPopResource, key.String())
 }
 
 func (tree *treeNode) visitNodes(visitor visitor.Visitor, path ...string) error {
 	errs := make([]error, 0)
 	for _, node := range tree.nodes {
-		appendError(&errs, node.visit(visitor, path...))
+		if err := node.visit(visitor, path...); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if len(errs) > 0 {
 		return goerr.Join(errs...)
@@ -97,7 +102,7 @@ func (tree *treeNode) visitNodes(visitor visitor.Visitor, path ...string) error 
 
 func (tree *treeNode) insert(obj *unstructured.Unstructured, path ...string) error {
 	if len(path) == 0 {
-		if tree.obj != nil {
+		if tree.obj != nil && !reflect.DeepEqual(obj, tree.obj) {
 			return ErrResourceConflict
 		}
 		tree.obj = obj
@@ -132,15 +137,17 @@ func (tree *treeNode) pop(path ...string) (*unstructured.Unstructured, error) {
 	if !ok {
 		return nil, ErrNotFound
 	}
+	defer func() {
+		if t.empty() {
+			// cleanup the child nodes if they're empty
+			delete(tree.nodes, zero)
+		}
+	}()
 	obj, err := t.pop(path...)
 	if err != nil {
 		// don't wrap this error, it'll get wrapped at the top of
 		// the tree
 		return nil, err
-	}
-	if t.empty() {
-		// cleanup the child nodes if they're empty
-		delete(tree.nodes, zero)
 	}
 	return obj, nil
 }
@@ -148,7 +155,7 @@ func (tree *treeNode) pop(path ...string) (*unstructured.Unstructured, error) {
 func (tree *treeNode) visit(visitor visitor.Visitor, path ...string) error {
 	if len(path) == 0 {
 		if tree.obj == nil {
-			return ErrNotFound
+			return nil
 		}
 		return visitor.Visit(tree.obj)
 	}
@@ -159,7 +166,7 @@ func (tree *treeNode) visit(visitor visitor.Visitor, path ...string) error {
 	}
 	t, ok := tree.nodes[zero]
 	if !ok {
-		return ErrNotFound
+		return nil
 	}
 	return t.visit(visitor, path...)
 }

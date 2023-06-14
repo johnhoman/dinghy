@@ -1,0 +1,10 @@
+apiVersion: bespoke.dev/v1alpha1
+kind: Config
+resources:
+- deployment.yaml
+mutate:
+- uses: builtin.bespoke.dev/namespace
+  with:
+    prefix: "foo-"
+    suffix: "-bar"
+    replace: "web-app"

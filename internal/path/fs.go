@@ -20,6 +20,13 @@ type fsPath struct {
 }
 
 func (f *fsPath) init() error {
+	if f.cur == "" {
+		var err error
+		f.cur, err = os.Getwd()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

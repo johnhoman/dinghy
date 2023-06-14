@@ -7,16 +7,7 @@ import (
 
 var (
 	_ Tree = &treeNode{}
-	_ Key  = &resourceKey{}
 )
-
-type Key interface {
-	GetName() string
-	GetNamespace() string
-	Kind() string
-	GroupVersion() string
-	String() string
-}
 
 type Tree interface {
 	Visit(visitor visitor.Visitor, opts ...MatchOption) error
@@ -34,11 +25,16 @@ func NewTree() Tree {
 	return &treeNode{nodes: make(map[string]*treeNode)}
 }
 
-// NewKey creates a resource key from the provided resource. The
+// ParseKey creates a resource key from the provided resource. The
 // resource key uniquely identifies a resource in a resource Tree. Keys
 // can be used to query toe Tree using Tree.Pop()
-func NewKey(obj *unstructured.Unstructured) Key {
-	return newResourceKey(obj)
+func ParseKey(obj *unstructured.Unstructured) Key {
+	return Key{
+		GroupVersion: obj.GetAPIVersion(),
+		Kind:         obj.GetKind(),
+		Name:         obj.GetName(),
+		Namespace:    obj.GetNamespace(),
+	}
 }
 
 // GetResource returns a resource from the tree without changing the state of

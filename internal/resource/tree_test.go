@@ -23,11 +23,11 @@ func TestTreeNode_Insert(t *testing.T) {
 					"namespace": "n1",
 				},
 			}},
-			key: resourceKey{
-				apiVersion: "v1",
-				kind:       "Pod",
-				name:       "p1",
-				namespace:  "n1",
+			key: Key{
+				GroupVersion: "v1",
+				Kind:         "Pod",
+				Name:         "p1",
+				Namespace:    "n1",
 			},
 		},
 	}
@@ -109,11 +109,11 @@ func TestTreeNode_Pop(t *testing.T) {
 					},
 				},
 			},
-			want: resourceKey{
-				name:       "p1",
-				namespace:  "n1",
-				kind:       "Pod",
-				apiVersion: "v1",
+			want: Key{
+				Name:         "p1",
+				Namespace:    "n1",
+				Kind:         "Pod",
+				GroupVersion: "v1",
 			},
 		},
 	}
@@ -128,7 +128,7 @@ func TestTreeNode_Pop(t *testing.T) {
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t,
 				newResourceKey(obj),
-				qt.CmpEquals(cmp.AllowUnexported(resourceKey{})),
+				qt.CmpEquals(cmp.AllowUnexported(Key{})),
 				tt.want,
 			)
 		})

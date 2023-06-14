@@ -1,0 +1,25 @@
+# patch was doing something to the spec that
+# made the merge patch on merge on port name
+apiVersion: bespoke.dev/v1alpha1
+kind: Config
+resources:
+- service.yaml
+mutate:
+- uses: builtin.bespoke.dev/patch
+  selector:
+    kinds: [Service]
+  with:
+    fieldPath: spec.type
+    value: NodePort
+- uses: builtin.bespoke.dev/strategicMergePatch
+  with:
+    spec:
+      ports:
+      - port: 80
+        targetPort: 9000
+- uses: builtin.bespoke.dev/strategicMergePatch
+  with:
+    spec:
+      ports:
+      - port: 80
+        name: http-app
