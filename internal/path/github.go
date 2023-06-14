@@ -173,10 +173,6 @@ func (g *github) Join(parts ...string) Path {
 		}
 	}
 
-	history := make([]string, 0, len(g.history))
-	for _, h := range g.history {
-		history = append(history, h)
-	}
 	// Copy the history and the tree over to the new path object.
 	// Copying once should allow the child to not require requesting
 	// the tree a second time, which won't change because we're passing
@@ -187,7 +183,7 @@ func (g *github) Join(parts ...string) Path {
 		owner:   g.owner,
 		repo:    g.repo,
 		sha:     g.sha,
-		history: g.history,
+		history: append([]string{}, g.history...),
 		tree:    g.tree,
 		cache:   g.cache,
 		path:    cur,

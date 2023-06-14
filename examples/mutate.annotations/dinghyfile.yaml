@@ -1,5 +1,7 @@
 apiVersion: dinghy.dev/v1alpha1
 kind: Config
+resources:
+- deployment.yaml
 mutate:
 - uses: builtin.dinghy.dev/metadata/annotations
   with:

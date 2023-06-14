@@ -206,13 +206,6 @@ func replaceVisitor(tree *treeNode, next visitor.Visitor) visitor.Visitor {
 	})
 }
 
-func appendError(errs *[]error, err error) {
-	if err == nil {
-		return
-	}
-	*errs = append(*errs, err)
-}
-
 func treeError(obj *unstructured.Unstructured) string {
 	return newResourceKey(obj).String()
 }

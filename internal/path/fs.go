@@ -120,9 +120,9 @@ func (f *fsPath) Join(path ...string) Path {
 	}
 	joined := filepath.Join(path...)
 	if filepath.IsAbs(joined) {
-		return NewFSPath(f.fs, joined)
+		return NewFSPath(fs, joined)
 	}
-	return NewFSPath(f.fs, filepath.Join(f.cur, joined))
+	return NewFSPath(fs, filepath.Join(f.cur, joined))
 }
 
 func (f *fsPath) Open() (io.Reader, error) {

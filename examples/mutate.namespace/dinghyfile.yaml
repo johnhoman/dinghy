@@ -3,8 +3,6 @@ kind: Config
 resources:
 - deployment.yaml
 mutate:
-- uses: builtin.dinghy.dev/namespace
+- uses: builtin.dinghy.dev/metadata/namespace
   with:
-    prefix: "foo-"
-    suffix: "-bar"
-    replace: "web-app"
+    namespace: "foo"

@@ -12,10 +12,6 @@ func newStringMap() any {
 	return make(map[string]string)
 }
 
-func newAnySlice() any {
-	return make([]any, 0)
-}
-
 func newConfig[T any]() NewConfigFunc {
 	return func() any {
 		t := new(T)

@@ -2,6 +2,7 @@ package mutate
 
 import (
 	"github.com/johnhoman/dinghy/internal/visitor"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func AddAnnotations(config any) (visitor.Visitor, error) {
@@ -38,4 +39,25 @@ func Namespace(config any) (visitor.Visitor, error) {
 
 func Metadata(patch any) (visitor.Visitor, error) {
 	return StrategicMergePatch(map[string]any{"metadata": patch})
+}
+
+func Labels(config any) (visitor.Visitor, error) {
+	m, ok := config.(*map[string]string)
+	if !ok {
+		return nil, ErrTypedConfig
+	}
+	if len(*m) == 0 {
+		return visitor.Nop(), nil
+	}
+	return visitor.Func(func(obj *unstructured.Unstructured) error {
+		l := obj.GetLabels()
+		if l == nil {
+			l = make(map[string]string)
+		}
+		for key, value := range *m {
+			l[key] = value
+		}
+		obj.SetLabels(l)
+		return nil
+	}), nil
 }

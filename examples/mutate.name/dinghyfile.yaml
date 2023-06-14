@@ -3,7 +3,7 @@ kind: Config
 resources:
 - deployment.yaml
 mutate:
-- uses: builtin.dinghy.dev/name
+- uses: builtin.dinghy.dev/metadata/name
   with:
     prefix: "foo-"
     suffix: "-bar"

@@ -1,4 +1,4 @@
-package dinghy
+package fieldpath
 
 type (
 	IndexType string

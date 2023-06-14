@@ -5,6 +5,7 @@ metadata:
   annotations:
     app.kubernetes.io/name: nginx
     app.kubernetes.io/part-of: testing.dinghy.dev
+    dinghy.dev/script: Hello, World!
   labels:
     app: nginx
 spec:

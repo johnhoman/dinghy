@@ -1,4 +1,4 @@
-package dinghy
+package fieldpath
 
 import (
 	"github.com/pkg/errors"

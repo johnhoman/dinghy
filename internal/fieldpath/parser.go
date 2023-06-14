@@ -1,4 +1,4 @@
-package dinghy
+package fieldpath
 
 import (
 	"io"
@@ -35,13 +35,6 @@ func (fp *parser) inc() {
 	}
 	fp.pos = fp.next
 	fp.next += 1
-}
-
-func (fp *parser) peek() byte {
-	if fp.pos >= len(fp.fieldPath) {
-		return 0
-	}
-	return fp.fieldPath[fp.next]
 }
 
 func (fp *parser) nextIndex() (index Index, err error) {

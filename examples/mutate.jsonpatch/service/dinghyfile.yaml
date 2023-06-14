@@ -5,21 +5,17 @@ kind: Config
 resources:
 - service.yaml
 mutate:
-- uses: builtin.dinghy.dev/patch
-  selector:
-    kinds: [Service]
-  with:
-    fieldPath: spec.type
-    value: NodePort
 - uses: builtin.dinghy.dev/strategicMergePatch
   with:
     spec:
+      type: ClusterIP
       ports:
       - port: 80
         targetPort: 9000
 - uses: builtin.dinghy.dev/strategicMergePatch
   with:
     spec:
+      type: NodePort
       ports:
       - port: 80
         name: http-app

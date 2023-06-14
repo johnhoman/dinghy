@@ -80,9 +80,7 @@ func (c *Config) AddResource(resource string) {
 // fieldPath sorted order.
 func (c *Config) GetResources() []string {
 	resources := make([]string, 0, len(c.Resources))
-	for _, item := range c.Resources {
-		resources = append(resources, item)
-	}
+	resources = append(resources, c.Resources...)
 	sort.Strings(resources)
 	return resources
 }

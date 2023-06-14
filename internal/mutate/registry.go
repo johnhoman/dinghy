@@ -60,27 +60,17 @@ type registry struct {
 var r = &registry{store: make(map[string]entry)}
 
 func init() {
-	type scriptConfig struct {
-		Script string         `yaml:"script" dinghy:"required"`
-		Config map[string]any `yaml:"config" dinghy:"required"`
-	}
 	// only visitors can traverse the tree, so the mutator registry should reference
 	// visitors, and all the visitors can live in the visitor.
-	MustRegister("builtin.dinghy.dev/strategicMergePatch", StrategicMergePatch, newAnyMap)
-	MustRegister("builtin.dinghy.dev/jsonpatch", JSONPatch, newAnySlice)
+	MustRegister("builtin.dinghy.dev/strategicMergePatch", StrategicMergePatch, newConfig[map[string]any]())
+	MustRegister("builtin.dinghy.dev/jsonpatch", JSONPatch, newConfig[[]any]())
+	MustRegister("builtin.dinghy.dev/patch", Patch, newConfig[patchConfig]())
 	MustRegister("builtin.dinghy.dev/metadata", Metadata, newAnyMap)
 	MustRegister("builtin.dinghy.dev/metadata/name", Name, newNameConfig)
 	MustRegister("builtin.dinghy.dev/metadata/namespace", Namespace, newNamespaceConfig)
 	MustRegister("builtin.dinghy.dev/metadata/annotations", AddAnnotations, newConfig[map[string]string]())
 	MustRegister("builtin.dinghy.dev/metadata/annotations/set", SetAnnotations, newStringMap)
-	MustRegister("builtin.dinghy.dev/script/js", func(config any) (visitor.Visitor, error) {
-		c, ok := config.(*scriptConfig)
-		if !ok {
-			return nil, ErrTypedConfig
-		}
-		return visitor.Script(c.Script, c.Config)
-	}, func() any {
-		return &scriptConfig{}
-	})
+	MustRegister("builtin.dinghy.dev/metadata/labels", Labels, newConfig[map[string]string]())
+	MustRegister("builtin.dinghy.dev/script/js", Script, newConfig[scriptConfig]())
 
 }

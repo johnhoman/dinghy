@@ -1,4 +1,4 @@
-package dinghy
+package fieldpath
 
 import (
 	qt "github.com/frankban/quicktest"

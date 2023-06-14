@@ -4,7 +4,7 @@ metadata:
   annotations:
     app.kubernetes.io/managed-by: dinghy.dev
     app.kubernetes.io/name: service
-    app.kubernetes.io/part-of: dinghy.dev
+    app.kubernetes.io/part-of: testing.dinghy.dev
   name: my-service
 spec:
   ports:
