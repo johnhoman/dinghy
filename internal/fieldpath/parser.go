@@ -74,9 +74,13 @@ func (fp *parser) nextIndex() (index Index, err error) {
 			if err != nil {
 				return
 			}
-			index.it = IndexTypeQuery
-			index.query.op = QueryOpCmpEqual
-			index.query.argument = next.index
+			index = Index{
+				it: IndexTypeQuery,
+				query: Query{
+					op:       QueryOpCmpEqual,
+					argument: next.index,
+				},
+			}
 			fallthrough
 		case ']':
 			fp.inc()

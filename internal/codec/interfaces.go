@@ -7,3 +7,7 @@ type Decoder interface {
 type Encoder interface {
 	Encode(obj any) error
 }
+
+type Validator interface {
+	Validate() []string
+}

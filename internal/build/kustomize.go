@@ -18,31 +18,20 @@ import (
 	"github.com/johnhoman/dinghy/internal/mutate"
 	"github.com/johnhoman/dinghy/internal/path"
 	"github.com/johnhoman/dinghy/internal/resource"
-	"github.com/johnhoman/dinghy/internal/visitor"
 )
 
-type KustomizeGeneratorConfig struct {
+type KustomizeGenerator struct {
 	Source string `yaml:"source"`
 }
 
-func KustomizeGenerator() generate.Generator {
-	return generate.Func(func(config any, opts ...generate.Option) (resource.Tree, error) {
-		c, ok := config.(*KustomizeGeneratorConfig)
-		if !ok {
-			return nil, generate.ErrTypedConfig
-		}
-		o := generate.Options{}
-		for _, f := range opts {
-			f(&o)
-		}
-		b := NewKustomize()
-		// I need the build directory here
-		dir, err := path.Parse(c.Source, path.WithRelativeRoot(o.Root))
-		if err != nil {
-			return nil, err
-		}
-		return b.Build(dir, WithPath(o.Root))
-	})
+func (c *KustomizeGenerator) Emit() (resource.Tree, error) {
+	b := NewKustomize()
+	source, err := path.Parse(c.Source)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.Build(source)
 }
 
 type kustomize struct{}
@@ -56,6 +45,7 @@ func (k *kustomize) Build(path path.Path, opts ...Option) (resource.Tree, error)
 }
 
 func (k *kustomize) buildFromConfig(c *types.Kustomization, opts ...Option) (resource.Tree, error) {
+
 	o := newOptions(opts...)
 	errs := &errList{}
 	for _, r := range c.Resources {
@@ -71,25 +61,18 @@ func (k *kustomize) buildFromConfig(c *types.Kustomization, opts ...Option) (res
 	}
 	// namePrefix
 	// nameSuffix
+	if len(c.NamePrefix) > 0 || len(c.NameSuffix) > 0 {
+		errs.Append(o.tree.Visit(&mutate.Name{Prefix: c.NamePrefix, Suffix: c.NameSuffix}))
+	}
 	// namespace
 	if len(c.Namespace) > 0 {
-		vis, err := mutate.Namespace(&visitor.NamespaceConfig{
-			Namespace: c.Namespace,
-		})
-		if err != nil {
-			return nil, err
-		}
-		errs.Append(o.tree.Visit(vis))
+		errs.Append(o.tree.Visit(&mutate.Namespace{Name: c.Namespace}))
 	}
 	// commonLabels
 	// commonAnnotations
 	if len(c.CommonAnnotations) > 0 {
-		vis, err := mutate.AddAnnotations(&c.CommonAnnotations)
-		if err != nil {
-			errs.Append(err)
-		} else {
-			errs.Append(o.tree.Visit(vis))
-		}
+		mu := mutate.Annotations(c.CommonAnnotations)
+		errs.Append(o.tree.Visit(&mu))
 	}
 	// patches is either a strategicMergePatch or a json patch. I guess it's
 	// up to me to guess which one, since they deprecated the method of
@@ -105,12 +88,12 @@ func (k *kustomize) buildFromConfig(c *types.Kustomization, opts ...Option) (res
 
 func ReadKustomizationFile(path path.Path) (*types.Kustomization, error) {
 	for _, name := range konfig.RecognizedKustomizationFileNames() {
-		ok, err := path.Join(name).Exists()
+		ok, err := path.Exists(name)
 		if err != nil {
 			return nil, err
 		}
 		if ok {
-			f, err := path.Join(name).Open()
+			f, err := path.Reader(name)
 			if err != nil {
 				return nil, err
 			}
@@ -118,7 +101,7 @@ func ReadKustomizationFile(path path.Path) (*types.Kustomization, error) {
 			return c, yaml.NewDecoder(f).Decode(c)
 		}
 	}
-	return nil, errors.Wrapf(os.ErrNotExist, path.Join(konfig.DefaultKustomizationFileName()).String())
+	return nil, errors.Wrapf(os.ErrNotExist, path.String(konfig.DefaultKustomizationFileName()))
 }
 
 func kustomizePatch(path path.Path, patch types.Patch, tree resource.Tree) error {
@@ -144,7 +127,7 @@ func kustomizePatch(path path.Path, patch types.Patch, tree resource.Tree) error
 		if !ok {
 			return errors.Wrapf(os.ErrNotExist, pp.String())
 		}
-		content, err = pp.Open()
+		content, err = pp.Reader()
 		if err != nil {
 			return err
 		}
@@ -158,26 +141,18 @@ func kustomizePatch(path path.Path, patch types.Patch, tree resource.Tree) error
 	var jp jsonpatch.Patch
 	// try jsonpatch first, if it doesn't decode, assume it's a strategicMergePatch
 	if err = codec.YAMLDecoder(bytes.NewReader(raw)).Decode(&jp); err == nil {
-		vis, err := mutate.JSONPatch(jp)
-		if err != nil {
-			return err
-		}
-		return tree.Visit(vis)
+		patch := mutate.JSONPatch(jp)
+		return tree.Visit(&patch)
 	}
 	var m map[string]any
 	if err := yaml.Unmarshal(raw, &m); err != nil {
 		return err
 	}
-	vis, err := mutate.StrategicMergePatch(&m)
-	if err != nil {
-		return err
-	}
-	return tree.Visit(vis, o...)
+	p := mutate.StrategicMergePatch(m)
+	return tree.Visit(&p, o...)
 }
 
 func init() {
 	// This package imports generate
-	generate.MustRegister("builtin.dinghy.dev/kustomize", KustomizeGenerator(), func() any {
-		return &KustomizeGeneratorConfig{}
-	})
+	generate.Register("builtin.dinghy.dev/kustomize", &KustomizeGenerator{})
 }

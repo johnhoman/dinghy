@@ -1,19 +1,14 @@
 package mutate
 
 import (
-	"encoding/json"
 	jsonpatch "github.com/evanphx/json-patch"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/johnhoman/dinghy/internal/visitor"
 )
 
-func JSONPatch(config any) (visitor.Visitor, error) {
-	raw, err := json.Marshal(config)
-	if err != nil {
-		return nil, err
-	}
-	patch := jsonpatch.Patch{}
-	if err := json.Unmarshal(raw, &patch); err != nil {
-		return nil, err
-	}
-	return visitor.JSONPatch(patch), nil
+type JSONPatch jsonpatch.Patch
+
+func (j *JSONPatch) Visit(obj *unstructured.Unstructured) error {
+	return visitor.JSONPatch(jsonpatch.Patch(*j)).Visit(obj)
 }

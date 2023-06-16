@@ -9,11 +9,11 @@ import (
 )
 
 func TestService(t *testing.T) {
-	c := &ServiceConfig{
+	c := &Service{
 		Name:  "webapp",
 		Image: "nginx:latest",
 	}
-	tree, err := Service().Emit(c)
+	tree, err := c.Emit()
 	qt.Assert(t, err, qt.IsNil)
 	keys := []resource.Key{
 		{GroupVersion: "apps/v1", Kind: "Deployment", Name: "webapp"},

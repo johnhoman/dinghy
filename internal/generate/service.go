@@ -13,48 +13,42 @@ import (
 )
 
 //go:embed service.tmpl
-var svcTemplate string
+var serviceContent string
 
-type ServiceConfig struct {
+type Service struct {
 	Name  string `yaml:"name"  dinghy:"required"`
 	Image string `yaml:"image" dinghy:"required"`
 }
 
-// Service generates the minimum necessary resources to
-// deploy a web app on a cluster.
-func Service() Generator {
-	return Func(func(config any, _ ...Option) (resource.Tree, error) {
-		c, ok := config.(*ServiceConfig)
-		if !ok {
-			return nil, ErrTypedConfig
-		}
-
-		tree := resource.NewTree()
-		tmpl, err := template.New("").Parse(svcTemplate)
-		if err != nil {
-			panic("BUG: internal serviceTemplates failed to parse")
-		}
-		buf := new(bytes.Buffer)
-		if err := tmpl.Execute(buf, c); err != nil {
+// Emit generates the minimum necessary resources to deploy a
+// web app on a cluster. Combine this generator with mutators
+// to customize the web app
+func (s *Service) Emit() (resource.Tree, error) {
+	tree := resource.NewTree()
+	tmpl, err := template.New("").Parse(serviceContent)
+	if err != nil {
+		panic("BUG: internal serviceTemplates failed to parse")
+	}
+	buf := new(bytes.Buffer)
+	if err := tmpl.Execute(buf, s); err != nil {
+		return nil, err
+	}
+	d := yaml.NewDecoder(buf)
+	for {
+		var m map[string]any
+		if err := d.Decode(&m); err != nil {
+			if err == io.EOF {
+				break
+			}
 			return nil, err
 		}
-		d := yaml.NewDecoder(buf)
-		for {
-			var m map[string]any
-			if err := d.Decode(&m); err != nil {
-				if err == io.EOF {
-					break
-				}
-				return nil, err
-			}
-			if m == nil {
-				continue
-			}
-			obj := &unstructured.Unstructured{Object: m}
-			if err := tree.Insert(obj); err != nil {
-				return nil, err
-			}
+		if m == nil {
+			continue
 		}
-		return tree, nil
-	})
+		obj := &unstructured.Unstructured{Object: m}
+		if err := tree.Insert(obj); err != nil {
+			return nil, err
+		}
+	}
+	return tree, nil
 }

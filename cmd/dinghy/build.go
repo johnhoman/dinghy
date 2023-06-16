@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/spf13/afero"
 	"io"
 
 	"github.com/johnhoman/dinghy/internal/build"
@@ -15,17 +14,15 @@ type cmdBuild struct {
 
 // Run builds the kustomization package and emits the resources
 // to stdout
-func (cmd *cmdBuild) Run(fs afero.Fs, wd path.Path, stdout io.Writer) error {
+func (cmd *cmdBuild) Run(stdout io.Writer) error {
 	// cmd.Dir could be relative to the current working directory, so it
 	// may need to be joined with the working directory
-
-	p, err := path.Parse(cmd.Dir, path.WithRelativeRoot(wd))
+	dir, err := path.Parse(cmd.Dir)
 	if err != nil {
-		return err
+		return nil
 	}
 
-	b := build.New()
-	tree, err := b.Build(p)
+	tree, err := build.New().Build(dir)
 	if err != nil {
 		return err
 	}

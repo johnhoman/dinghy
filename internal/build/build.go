@@ -28,23 +28,29 @@ func NewKustomize() Builder {
 }
 
 func buildResource(r string, root path.Path, tree resource.Tree, newBuilderFunc func() Builder) error {
-	p, err := path.Parse(r, path.WithRelativeRoot(root))
-	if err != nil {
-		return err
+	target := root.Join(r)
+	if !path.IsRelative(r) {
+		parsed, err := path.Parse(r)
+		if err != nil {
+			return err
+		}
+		target = parsed
 	}
-	isDir, err := p.IsDir()
+
+	isDir, err := target.IsDir()
 	if err != nil {
 		return err
 	}
 	if isDir {
 		b := newBuilderFunc()
-		sub, err := b.Build(p)
+		sub, err := b.Build(target)
 		if err != nil {
 			return err
 		}
 		return resource.CopyTree(tree, sub)
 	}
-	f, err := p.Open()
+
+	f, err := target.Reader()
 	if err != nil {
 		return err
 	}

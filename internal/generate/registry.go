@@ -2,19 +2,19 @@ package generate
 
 import (
 	"github.com/pkg/errors"
+	"reflect"
 )
 
 var (
-	ErrTypedConfig = errors.New("failed convert to typed config")
-	ErrNotFound    = errors.New("mutator not found")
+	ErrNotFound = errors.New("mutator not found")
 )
 
-func Get(name string) (Generator, NewConfigFunc, error) {
-	e, ok := r.store[name]
+func Get(name string) (any, error) {
+	f, ok := r.store[name]
 	if !ok {
-		return nil, nil, ErrNotFound
+		return nil, ErrNotFound
 	}
-	return e.g, e.newConfig, nil
+	return f(), nil
 }
 
 func Has(name string) bool {
@@ -27,37 +27,21 @@ func Has(name string) bool {
 // will be up to the Mutator to convert the config to the correct type. The registry
 // will handle deserializing YAML into the returned config when the Mutator plugin
 // is invoked
-func Register(name string, f Generator, newConfig NewConfigFunc) error {
-	if newConfig == nil {
-		newConfig = func() any {
-			return make(map[string]any)
-		}
+func Register(name string, f Generator) {
+	r.store[name] = func() any {
+		t := reflect.TypeOf(f).Elem()
+		return reflect.New(t).Interface()
 	}
-	r.store[name] = entry{g: f, newConfig: newConfig}
-	return nil
-}
-
-// MustRegister is just like Register, but it panics it can't register the
-// mutator.
-func MustRegister(name string, f Generator, newConfig func() any) {
-	if err := Register(name, f, newConfig); err != nil {
-		panic(err)
-	}
-}
-
-type entry struct {
-	g         Generator
-	newConfig func() any
 }
 
 type registry struct {
-	store map[string]entry
+	store map[string]func() any
 }
 
-var r = &registry{store: make(map[string]entry)}
+var r = &registry{store: make(map[string]func() any)}
 
 func init() {
 	// only visitors can traverse the Tree, so the mutator registry should reference
 	// visitors, and all the visitors can live in the visitor.
-	MustRegister("builtin.dinghy.dev/service", Service(), newConfig[ServiceConfig]())
+	Register("builtin.dinghy.dev/service", &Service{})
 }

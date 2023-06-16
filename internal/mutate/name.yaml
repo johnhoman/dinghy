@@ -1,0 +1,32 @@
+Secret:
+  apps.Deployment:
+  - spec/template/spec/volumes/volumes/secret/secretName
+  - spec/template/spec/containers/env/valueFrom/secretKeyRef/name
+  apps.StatefulSet:
+  - spec/template/spec/volumes/volumes/secret/secretName
+  - spec/template/spec/containers/env/valueFrom/secretKeyRef/name
+  apps.DaemonSet:
+  - spec/template/spec/volumes/volumes/secret/secretName
+  - spec/template/spec/containers/env/valueFrom/secretKeyRef/name
+  apps.ReplicaSet:
+  - spec/template/spec/volumes/volumes/secret/secretName
+  - spec/template/spec/containers/env/valueFrom/secretKeyRef/name
+  Pod:
+  - spec/template/spec/volumes/volumes/secret/secretName
+  - spec/template/spec/containers/env/valueFrom/secretKeyRef/name
+ConfigMap:
+  Deployment.apps:
+  - spec/template/spec/volumes/configMap/name
+  - spec/template/spec/containers/env/valueFrom/configMapKeyRef/name
+  StatefulSet.apps:
+  - spec/template/spec/volumes/configMap/name
+  - spec/template/spec/containers/env/valueFrom/configMapKeyRef/name
+  DaemonSet.apps:
+  - spec/template/spec/volumes/configMap/name
+  - spec/template/spec/containers/env/valueFrom/configMapKeyRef/name
+  ReplicaSet.apps:
+  - spec/template/spec/volumes/configMap/name
+  - spec/template/spec/containers/env/valueFrom/configMapKeyRef/name
+  Pod:
+  - spec/template/spec/volumes/configMap/name
+  - spec/template/spec/containers/env/valueFrom/configMapKeyRef/name

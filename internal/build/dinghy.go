@@ -1,8 +1,10 @@
 package build
 
 import (
+	"bytes"
 	goerr "errors"
 	"fmt"
+	"github.com/johnhoman/dinghy/internal/visitor"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -62,14 +64,6 @@ func (d *dinghy) BuildFromConfig(c *types.Config, opts ...Option) (resource.Tree
 			errs.Append(fmt.Errorf("mutator %q does not exist", use))
 			continue
 		}
-		_, newConfig, _ := mutate.Get(use)
-		// also check typed configs
-		with := m.With
-		typed := newConfig()
-		if err := codec.YAMLCopyTo(typed, with); err != nil {
-			errs.Append(err)
-			continue
-		}
 
 		for _, kind := range m.Selector.Kinds {
 			if strings.Count(kind, "/") > 2 {
@@ -78,18 +72,8 @@ func (d *dinghy) BuildFromConfig(c *types.Config, opts ...Option) (resource.Tree
 		}
 	}
 	for _, m := range c.Generators {
-		use := m.Uses
-		if !generate.Has(use) {
-			errs.Append(fmt.Errorf("generator %q does not exist", use))
-			continue
-		}
-		_, newConfig, _ := generate.Get(use)
-		// also check typed configs
-		with := m.With
-		typed := newConfig()
-		if err := codec.YAMLCopyTo(typed, with); err != nil {
-			errs.Append(err)
-			continue
+		if !generate.Has(m.Uses) {
+			errs.Append(fmt.Errorf("generator %q does not exist", m.Uses))
 		}
 	}
 	if !errs.Empty() {
@@ -116,45 +100,29 @@ func (d *dinghy) BuildFromConfig(c *types.Config, opts ...Option) (resource.Tree
 
 	errs = &errList{}
 	for _, m := range c.Mutations {
-		f, newConfig, err := mutate.Get(m.Uses)
-		if err != nil {
-			errs.Append(err)
-			continue
-		}
-		typed := newConfig()
-		if err := codec.YAMLCopyTo(typed, m.With); err != nil {
-			errs.Append(err)
-			continue
-		}
+		vis := m.With.(visitor.Visitor)
+
 		kinds := make([]schema.GroupVersionKind, 0)
 		for _, kind := range m.Selector.Kinds {
 			kinds = append(kinds, parseKind(kind))
 		}
-		vis, err := f(typed)
+		if se, ok := vis.(mutate.SideEffectVisitor); ok {
+			vis = mutate.SideEffect(se, o.tree)
+		}
+
+		err := o.tree.Visit(vis,
+			resource.MatchLabels(m.Selector.MatchLabels),
+			resource.MatchNames(m.Selector.Names...),
+			resource.MatchNamespaces(m.Selector.Namespaces...),
+			resource.MatchKinds(kinds...))
 		if err != nil {
 			errs.Append(err)
 			continue
 		}
-		err = o.tree.Visit(vis,
-			resource.MatchLabels(m.Selector.MatchLabels),
-			resource.MatchNames(m.Selector.Names...),
-			resource.MatchNamespaces(m.Selector.Namespaces...),
-			resource.MatchKinds(kinds...),
-		)
-		if err != nil {
-			errs.Append(err)
-		}
 	}
 	for _, spec := range c.Generators {
-		gen, newConfig, err := generate.Get(spec.Uses)
-		if err != nil {
-			errs.Append(err)
-		}
-		typed := newConfig()
-		if err := codec.YAMLCopyTo(typed, spec.With); err != nil {
-			errs.Append(err)
-		}
-		tr, err := gen.Emit(typed, generate.WithDirectoryRoot(o.path))
+		gen := spec.With.(generate.Generator)
+		tr, err := gen.Emit()
 		if err != nil {
 			errs.Append(err)
 		} else {
@@ -188,13 +156,13 @@ func newOptions(opts ...Option) *options {
 
 // ReadDinghyFile loads the dingy file in the current path if it exists. If,
 // it doesn't exist, os.ErrNotExist is returned
-func ReadDinghyFile(path path.Path) (*types.Config, error) {
-	r, err := path.Join(DinghyFile).Open()
+func ReadDinghyFile(p path.Path) (*types.Config, error) {
+	data, err := p.ReadFile(DinghyFile)
 	if err != nil {
 		return nil, err
 	}
 	c := &types.Config{}
-	return c, codec.YAMLDecoder(r).Decode(c)
+	return c, codec.YAMLDecoder(bytes.NewReader(data)).Decode(c)
 }
 
 type errList []error

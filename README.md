@@ -1,11 +1,11 @@
 # Dinghy
-A new kustomize that's extensible
+Another Kubernetes package management tool
 
-## Goals
-1. Add additional config fields to the kustomization yaml
-2. Improve speed (caching instead of temporary directories)
+## Examples
 
+### Generators
 ```yaml
 apiVersion: dinghy.dev/v1beta1
 kind: Config
+
 ```

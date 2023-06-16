@@ -2,6 +2,7 @@ apiVersion: dinghy.dev/v1alpha1
 kind: Config
 resources:
 - deployment.yaml
+- configmap.yaml
 mutate:
 - uses: builtin.dinghy.dev/metadata/name
   with:

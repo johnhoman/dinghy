@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"io"
-	gofs "io/fs"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,45 +11,39 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	"github.com/johnhoman/dinghy/internal/path"
 )
 
 func TestCmdBuild_Run(t *testing.T) {
-	fs := afero.NewOsFs()
+	afs := afero.NewOsFs()
 	examples := "../../examples/"
 
 	matches := make([]string, 0)
-	err := afero.Walk(fs, examples, func(path string, info gofs.FileInfo, err error) error {
+	err := afero.Walk(afs, examples, func(path string, info fs.FileInfo, err error) error {
 		if !info.IsDir() {
 			return nil
 		}
 		pkg := filepath.Join(path, "dinghyfile.yaml")
-		if _, err := fs.Stat(pkg); err == nil {
+		if _, err := afs.Stat(pkg); err == nil {
 			matches = append(matches, path)
 		}
 		return nil
 	})
 	qt.Assert(t, err, qt.IsNil)
 
-	wd, err := os.Getwd()
-	qt.Assert(t, err, qt.IsNil)
-	p := path.NewFSPath(afero.NewOsFs(), wd)
-
 	for _, dir := range matches {
 		t.Run(strings.TrimPrefix(dir, examples), func(t *testing.T) {
 			cmd := &cmdBuild{Dir: dir}
 			buf := new(bytes.Buffer)
-			qt.Assert(t, cmd.Run(fs, p, buf), qt.IsNil)
+			qt.Assert(t, cmd.Run(buf), qt.IsNil)
 			got := decodeStream(t, buf)
-			want := decodeExpected(t, filepath.Join(wd, dir))
+			want := decodeExpected(t, filepath.Join(dir))
 			qt.Assert(t, got, qt.DeepEquals, want)
 		})
 	}
-
 }
 
 func decodeStream(t *testing.T, r io.Reader) []any {
@@ -58,7 +52,7 @@ func decodeStream(t *testing.T, r io.Reader) []any {
 	for {
 		var obj map[string]any
 		err := d.Decode(&obj)
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		qt.Assert(t, err, qt.IsNil)

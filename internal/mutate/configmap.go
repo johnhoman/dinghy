@@ -12,40 +12,41 @@ const (
 	ErrKeyError = "the requested key could not be found"
 )
 
-type ConfigMapJSONPatchConfig struct {
+type ConfigMapJSONPatch struct {
 	// Key is the config map key to patch. The value
 	// at the provided key will be decoded into
 	Key   string `yaml:"key" dinghy:"required"`
 	Patch []any  `yaml:"patch" dinghy:"required"`
 }
 
-func ConfigMapJSONPatch(config any) (visitor.Visitor, error) {
-	c, ok := config.(*ConfigMapJSONPatchConfig)
-	if !ok {
-		return nil, ErrTypedConfig
-	}
+func (c *ConfigMapJSONPatch) Visit(obj *unstructured.Unstructured) error {
 	raw, err := json.Marshal(c.Patch)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	patch := jsonpatch.Patch{}
 	if err := json.Unmarshal(raw, &patch); err != nil {
-		return nil, err
+		return err
+	}
+	o := obj.UnstructuredContent()
+	v, ok, err := unstructured.NestedString(o, "data", c.Key)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.Errorf("%s: %q", ErrKeyError, c.Key)
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(v), &m); err != nil {
+		return err
+	}
+	if err := visitor.Visit(visitor.JSONPatch(patch), m); err != nil {
+		return err
 	}
 
-	return visitor.Func(func(obj *unstructured.Unstructured) error {
-		o := obj.UnstructuredContent()
-		v, ok, err := unstructured.NestedString(o, "data", c.Key)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return errors.Errorf("%s: %q", ErrKeyError, c.Key)
-		}
-		var m map[string]any
-		if err := json.Unmarshal([]byte(v), &m); err != nil {
-			return err
-		}
-		return visitor.Visit(visitor.JSONPatch(patch), m)
-	}), nil
+	if err := unstructured.SetNestedField(o, "data", c.Key); err != nil {
+		return err
+	}
+	obj.SetUnstructuredContent(o)
+	return nil
 }
