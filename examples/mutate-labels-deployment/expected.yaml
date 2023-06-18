@@ -11,10 +11,14 @@ spec:
   selector:
     matchLabels:
       app: nginx
+      app.kubernetes.io/name: nginx
+      app.kubernetes.io/part-of: testing.dinghy.dev
   template:
     metadata:
       labels:
         app: nginx
+        app.kubernetes.io/name: nginx
+        app.kubernetes.io/part-of: testing.dinghy.dev
     spec:
       containers:
         - name: nginx
