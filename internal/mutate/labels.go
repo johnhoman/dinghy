@@ -1,9 +1,10 @@
 package mutate
 
 import (
+	"strings"
+
 	"github.com/johnhoman/dinghy/internal/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"strings"
 )
 
 // Labels mutates the labels on a resource and any selectors that may
