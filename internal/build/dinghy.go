@@ -2,26 +2,48 @@ package build
 
 import (
 	"bytes"
-	goerr "errors"
 	"fmt"
-	"github.com/johnhoman/dinghy/internal/visitor"
-	"strings"
-
-	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"github.com/johnhoman/dinghy/internal/codec"
+	"github.com/johnhoman/dinghy/internal/context"
 	"github.com/johnhoman/dinghy/internal/generate"
 	"github.com/johnhoman/dinghy/internal/mutate"
 	"github.com/johnhoman/dinghy/internal/path"
 	"github.com/johnhoman/dinghy/internal/resource"
 	"github.com/johnhoman/dinghy/internal/types"
+	"github.com/johnhoman/dinghy/internal/visitor"
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
+	"io"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"strings"
 )
 
 const (
 	DinghyFile        = "dinghyfile.yaml"
 	ErrReadDinghyFile = "failed to read required file " + DinghyFile
 )
+
+type ErrMutateFailedApply struct {
+	// the name of the mutator
+	Name string
+	// description is the reason the error occured
+	Description string
+	// Err is the actual error message
+	Err error
+}
+
+func ErrMutateFailedYAMLDecode(name string, description string, parent error) error {
+	return &ErrMutateFailedApply{
+		Name:        name,
+		Description: description,
+		Err:         parent,
+	}
+}
+
+func (err *ErrMutateFailedApply) Error() string {
+	return fmt.Sprintf(err.Description)
+}
 
 type Option func(o *options)
 
@@ -54,53 +76,45 @@ type options struct {
 
 type dinghy struct{}
 
-func (d *dinghy) BuildFromConfig(c *types.Config, opts ...Option) (resource.Tree, error) {
-
-	// validate config
-	errs := &errList{}
-	for _, m := range c.Mutations {
-		use := m.Uses
-		if !mutate.Has(use) {
-			errs.Append(fmt.Errorf("mutator %q does not exist", use))
-			continue
-		}
-
-		for _, kind := range m.Selector.Kinds {
-			if strings.Count(kind, "/") > 2 {
-				errs.Append(fmt.Errorf("kind string must be in the form group/version/kind"))
-			}
-		}
-	}
-	for _, m := range c.Generators {
-		if !generate.Has(m.Uses) {
-			errs.Append(fmt.Errorf("generator %q does not exist", m.Uses))
-		}
-	}
-	if !errs.Empty() {
-		return nil, errs
-	}
-
+func (d *dinghy) BuildFromConfig(ctx *context.Context, c *types.Config, opts ...Option) (resource.Tree, error) {
 	o := newOptions(opts...)
+
 	// build resources
-	errs = &errList{}
 	for _, r := range c.Resources {
+		// sub-resources, such as other dinghy packages can contain
+		// transformers that should only act on their set of resources,
+		// so we need to provide a new tree so that none of the current
+		// resources are mutated
 		rt := resource.NewTree()
-		if err := buildResource(r, o.path, rt, New); err != nil {
-			errs.Append(err)
+		if err := d.buildResource(ctx, r, o.path, rt); err != nil {
+			return nil, err
 		}
 		if err := resource.CopyTree(o.tree, rt); err != nil {
-			errs.Append(err)
-		}
-	}
-	for _, r := range c.Overlays {
-		if err := buildResource(r, o.path, o.tree, New); err != nil {
-			errs.Append(err)
+			return nil, err
 		}
 	}
 
-	errs = &errList{}
+	for _, r := range c.Overlays {
+		if err := d.buildResource(ctx, r, o.path, o.tree); err != nil {
+			return nil, err
+		}
+	}
+
 	for _, m := range c.Mutations {
-		vis := m.With.(visitor.Visitor)
+		typed, err := mutate.Get(m.Uses)
+		if err != nil {
+			return nil, err
+		}
+		data, err := yaml.Marshal(m.With)
+		if err != nil {
+			return nil, err
+		}
+		d := yaml.NewDecoder(bytes.NewBuffer(data))
+		d.KnownFields(true)
+		if err = d.Decode(typed); err != nil {
+			return nil, err
+		}
+		vis := typed.(visitor.Visitor)
 
 		kinds := make([]schema.GroupVersionKind, 0)
 		for _, kind := range m.Selector.Kinds {
@@ -110,38 +124,97 @@ func (d *dinghy) BuildFromConfig(c *types.Config, opts ...Option) (resource.Tree
 			vis = mutate.SideEffect(se, o.tree)
 		}
 
-		err := o.tree.Visit(vis,
+		if err := o.tree.Visit(vis,
 			resource.MatchLabels(m.Selector.MatchLabels),
 			resource.MatchNames(m.Selector.Names...),
 			resource.MatchNamespaces(m.Selector.Namespaces...),
-			resource.MatchKinds(kinds...))
-		if err != nil {
-			errs.Append(err)
-			continue
+			resource.MatchKinds(kinds...)); err != nil {
+			return nil, err
 		}
 	}
 	for _, spec := range c.Generators {
-		gen := spec.With.(generate.Generator)
-		tr, err := gen.Emit()
+		sub, err := d.doGenerate(ctx, spec)
 		if err != nil {
-			errs.Append(err)
-		} else {
-			errs.Append(resource.CopyTree(o.tree, tr))
+			return nil, err
 		}
-	}
-	if !errs.Empty() {
-		return nil, errs
+		if err = resource.CopyTree(o.tree, sub); err != nil {
+			return nil, err
+		}
 	}
 
 	return o.tree, nil
 }
 
-func (d *dinghy) Build(path path.Path, opts ...Option) (resource.Tree, error) {
+func (d *dinghy) buildResource(ctx *context.Context, r string, root path.Path, tree resource.Tree) error {
+	target := root.Join(r)
+	if !path.IsRelative(r) {
+		parsed, err := path.Parse(r)
+		if err != nil {
+			return err
+		}
+		target = parsed
+	}
+
+	isDir, err := target.IsDir()
+	if err != nil {
+		return err
+	}
+	if isDir {
+		var sub resource.Tree
+		sub, err = d.Build(ctx, target)
+		if err != nil {
+			return err
+		}
+		return resource.CopyTree(tree, sub)
+	}
+
+	f, err := target.Reader()
+	if err != nil {
+		return err
+	}
+	dec := yaml.NewDecoder(f)
+	for {
+		var m map[string]any
+		if err := dec.Decode(&m); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		if m == nil {
+			continue
+		}
+		obj := &unstructured.Unstructured{Object: m}
+		if err = tree.Insert(obj); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *dinghy) doGenerate(ctx *context.Context, spec types.GeneratorSpec) (resource.Tree, error) {
+	typed, err := generate.Get(spec.Uses)
+	if err != nil {
+		return nil, err
+	}
+	data, err := yaml.Marshal(spec.With)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := yaml.Unmarshal(data, typed); err != nil {
+		return nil, err
+	}
+
+	return typed.(generate.Generator).Emit(ctx)
+}
+
+func (d *dinghy) Build(ctx *context.Context, path path.Path, opts ...Option) (resource.Tree, error) {
 	c, err := ReadDinghyFile(path)
 	if err != nil {
 		return nil, errors.Wrapf(err, ErrReadDinghyFile)
 	}
-	return d.BuildFromConfig(c, append(opts, WithPath(path))...)
+	return d.BuildFromConfig(ctx, c, append(opts, WithPath(path))...)
 }
 
 func newOptions(opts ...Option) *options {
@@ -163,27 +236,6 @@ func ReadDinghyFile(p path.Path) (*types.Config, error) {
 	}
 	c := &types.Config{}
 	return c, codec.YAMLDecoder(bytes.NewReader(data)).Decode(c)
-}
-
-type errList []error
-
-func (err *errList) Append(e error) {
-	if e == nil {
-		return
-	}
-	*err = append(*err, e)
-}
-func (err *errList) Error() string { return goerr.Join(*err...).Error() }
-
-func (err *errList) Len() int {
-	if err == nil {
-		return 0
-	}
-	return len(*err)
-}
-
-func (err *errList) Empty() bool {
-	return err.Len() == 0
 }
 
 func parseKind(kind string) schema.GroupVersionKind {

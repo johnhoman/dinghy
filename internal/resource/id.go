@@ -8,10 +8,11 @@ import (
 
 func newResourceKey(obj *unstructured.Unstructured) Key {
 	gvk := obj.GroupVersionKind()
+	name := obj.GetName()
 	key := Key{
 		Kind:         gvk.Kind,
 		GroupVersion: obj.GroupVersionKind().GroupVersion().String(),
-		Name:         obj.GetName(),
+		Name:         name,
 		Namespace:    obj.GetNamespace(),
 	}
 	return key

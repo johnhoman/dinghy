@@ -5,7 +5,6 @@ import (
 	"github.com/johnhoman/dinghy/internal/codec"
 	"github.com/johnhoman/dinghy/internal/generate"
 	"github.com/johnhoman/dinghy/internal/mutate"
-	"gopkg.in/yaml.v3"
 	"sort"
 )
 
@@ -103,18 +102,6 @@ func (c *Config) Validate() []string {
 			errs = append(errs, fmt.Sprintf("generate[%d]: %q does not exist", k, gen.Uses))
 			continue
 		}
-		vis, err := generate.Get(gen.Uses)
-		if err != nil {
-			panic("BUG: why is this happening. I just made sure it existed")
-		}
-		in, err := yaml.Marshal(gen.With)
-		if err != nil {
-			panic("BUG: this was just decoded")
-		}
-		if err := yaml.Unmarshal(in, vis); err != nil {
-			errs = append(errs, fmt.Sprintf("mutate[%d].with: could not convert to typed config %T", k, vis))
-		}
-		c.Generators[k].With = vis
 	}
 
 	for k, mu := range c.Mutations {
@@ -126,18 +113,6 @@ func (c *Config) Validate() []string {
 			errs = append(errs, fmt.Sprintf("mutate[%d]: %q does not exist", k, mu.Uses))
 			continue
 		}
-		vis, err := mutate.Get(mu.Uses)
-		if err != nil {
-			panic("BUG: why is this happening. I just made sure it existed")
-		}
-		in, err := yaml.Marshal(mu.With)
-		if err != nil {
-			panic("BUG: this was just decoded")
-		}
-		if err := yaml.Unmarshal(in, vis); err != nil {
-			errs = append(errs, fmt.Sprintf("mutate[%d].with: could not convert to typed config %T", k, vis))
-		}
-		c.Mutations[k].With = vis
 	}
 	return nil
 }

@@ -18,3 +18,7 @@ jobs:
           skip-pkg-cache: true
       - run: go mod tidy && git diff --check
       - run: make test
+      - uses: github/codeql-action/init@83f0fe6c4988d98a455712a27f0255212bba9bd4 # v2
+        with:
+          languages: go
+      - uses: github/codeql-action/analyze@83f0fe6c4988d98a455712a27f0255212bba9bd4 # v2

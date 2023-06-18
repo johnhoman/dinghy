@@ -44,4 +44,5 @@ func init() {
 	// only visitors can traverse the Tree, so the mutator registry should reference
 	// visitors, and all the visitors can live in the visitor.
 	Register("builtin.dinghy.dev/service", &Service{})
+	Register("builtin.dinghy.dev/kustomize", &Kustomize{})
 }

@@ -48,7 +48,6 @@ func NewGitHub(owner, repo, ref, token string) *GitHub {
 }
 
 func (g *GitHub) join(root string, segments ...string) string {
-	segments = append([]string{root}, segments...)
 	return path.Join(root, path.Join(segments...))
 }
 
@@ -63,8 +62,9 @@ func (g *GitHub) ReadFile(filePath string) ([]byte, error) {
 		return nil, err
 	}
 
-	url := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", g.Owner, g.Repo, g.Ref, filePath)
-	return githubGet(url, g.Token)
+	return githubGet(
+		fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", g.Owner, g.Repo, g.Ref, filePath),
+		g.Token)
 }
 
 func (g *GitHub) IsDir(path string) (bool, error) {
@@ -79,7 +79,7 @@ func (g *GitHub) IsDir(path string) (bool, error) {
 		}
 	}
 
-	return false, os.ErrNotExist
+	return false, errors.Wrapf(os.ErrNotExist, g.toString(path))
 }
 
 func (g *GitHub) getGitHubTree() (githubTreeResponse, error) {
@@ -89,9 +89,9 @@ func (g *GitHub) getGitHubTree() (githubTreeResponse, error) {
 		return tree, err
 	}
 
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/trees/%s", g.Owner, g.Repo, g.Ref)
+	u := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/trees/%s?recursive=\"true\"", g.Owner, g.Repo, g.Ref)
 
-	data, err := githubGet(url, g.Token)
+	data, err := githubGet(u, g.Token)
 	if err != nil {
 		return tree, err
 	}
@@ -117,19 +117,38 @@ func (g *GitHub) checkRef() error {
 	return nil
 }
 
-var github struct {
+type githubCache struct {
 	sync.RWMutex
 	cache map[string][]byte
 }
 
-func init() {
-	github.RWMutex = sync.RWMutex{}
-	github.cache = make(map[string][]byte)
+func (g *githubCache) put(key string, data any) {
+	if raw, err := json.Marshal(data); err == nil {
+		g.Lock()
+		g.cache[key] = raw
+		g.Unlock()
+	}
 }
 
+func (g *githubCache) get(key string, data any) {
+	g.RLock()
+	raw, ok := g.cache[key]
+	g.RUnlock()
+	if ok {
+		_ = json.Unmarshal(raw, data)
+	}
+}
+
+var (
+	github = &githubCache{
+		RWMutex: sync.RWMutex{},
+		cache:   make(map[string][]byte),
+	}
+)
+
 func githubGetDefaultBranch(owner, repo, pat string) (string, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s", owner, repo)
-	data, err := githubGet(url, pat)
+	u := fmt.Sprintf("https://api.github.com/repos/%s/%s", owner, repo)
+	data, err := githubGet(u, pat)
 
 	var body struct {
 		DefaultBranch string `json:"default_branch"`
@@ -170,8 +189,8 @@ func getGitHubSHA(owner, repo, ref, pat string) (string, error) {
 		return string(sha), nil
 	}
 
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/refs/%s", owner, repo, ref)
-	data, err := githubGet(url, pat)
+	u := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s", owner, repo, ref)
+	data, err := githubGet(u, pat)
 	if err != nil {
 		return "", err
 	}
@@ -210,14 +229,13 @@ func githubGet(url, pat string) ([]byte, error) {
 
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	client := http.DefaultClient
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
+	resp, err := http.DefaultClient.Do(req)
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub request failed: %q", url)
+		b, err := io.ReadAll(resp.Body)
+		if err != nil {
+			b = make([]byte, 0)
+		}
+		return nil, fmt.Errorf("GitHub request failed: %q: %s", url, string(b))
 	}
 
 	data, err = io.ReadAll(resp.Body)

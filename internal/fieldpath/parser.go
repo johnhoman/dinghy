@@ -75,7 +75,8 @@ func (fp *parser) nextIndex() (index Index, err error) {
 				return
 			}
 			index = Index{
-				it: IndexTypeQuery,
+				index: index.index,
+				it:    IndexTypeQuery,
 				query: Query{
 					op:       QueryOpCmpEqual,
 					argument: next.index,

@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"github.com/johnhoman/dinghy/internal/context"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -13,7 +14,7 @@ func TestService(t *testing.T) {
 		Name:  "webapp",
 		Image: "nginx:latest",
 	}
-	tree, err := c.Emit()
+	tree, err := c.Emit(&context.Context{})
 	qt.Assert(t, err, qt.IsNil)
 	keys := []resource.Key{
 		{GroupVersion: "apps/v1", Kind: "Deployment", Name: "webapp"},

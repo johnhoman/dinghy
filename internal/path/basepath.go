@@ -1,6 +1,8 @@
 package path
 
-import "io"
+import (
+	"io"
+)
 
 func NewPath(path impl, root string) Path {
 	return Path{

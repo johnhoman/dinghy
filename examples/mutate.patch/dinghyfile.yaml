@@ -5,7 +5,8 @@ resources:
 mutate:
 - uses: builtin.dinghy.dev/patch
   with:
-    fieldPath: spec.replicas
+    fieldPaths:
+    - spec.replicas
     value: 10
 - uses: builtin.dinghy.dev/patch
   with:
@@ -17,5 +18,6 @@ mutate:
       app.kubernetes.io/part-of: testing.dinghy.dev
 - uses: builtin.dinghy.dev/patch
   with:
-    fieldPath: metadata.labels['app.kubernetes.io/managed-by']
+    fieldPaths:
+    - metadata.labels['app.kubernetes.io/managed-by']
     value: dinghy.dev

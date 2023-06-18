@@ -5,4 +5,4 @@ resources:
 mutate:
 - uses: builtin.dinghy.dev/metadata/namespace
   with:
-    namespace: "foo"
+    name: "foo"

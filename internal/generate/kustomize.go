@@ -1,8 +1,7 @@
-package build
+package generate
 
 import (
 	"bytes"
-	"github.com/johnhoman/dinghy/internal/generate"
 	"io"
 	"os"
 	"strings"
@@ -10,23 +9,42 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/api/types"
 
 	"github.com/johnhoman/dinghy/internal/codec"
+	"github.com/johnhoman/dinghy/internal/context"
 	"github.com/johnhoman/dinghy/internal/mutate"
 	"github.com/johnhoman/dinghy/internal/path"
 	"github.com/johnhoman/dinghy/internal/resource"
 )
 
-type KustomizeGenerator struct {
+type Kustomize struct {
 	Source string `yaml:"source"`
 }
 
-func (c *KustomizeGenerator) Emit() (resource.Tree, error) {
-	b := NewKustomize()
-	source, err := path.Parse(c.Source)
+// Emit a kustomization package tree
+func (c *Kustomize) Emit(ctx *context.Context) (resource.Tree, error) {
+
+	// if the source is a relative path, then we need to get the root
+	// of the build from the context, e.g. where the dinghy file is relative
+	// to the current working directory, because the generator referencing the
+	// kustomization package will be relative to that.
+	src := c.Source
+	if path.IsRelative(c.Source) {
+		// I need to join it to the relative root, which could potentially
+		// be an external path
+		pth, err := path.Parse(ctx.Root())
+		if err != nil {
+			return nil, err
+		}
+		src = pth.String(c.Source)
+	}
+
+	b := &kustomize{}
+	source, err := path.Parse(src)
 	if err != nil {
 		return nil, err
 	}
@@ -36,54 +54,110 @@ func (c *KustomizeGenerator) Emit() (resource.Tree, error) {
 
 type kustomize struct{}
 
-func (k *kustomize) Build(path path.Path, opts ...Option) (resource.Tree, error) {
+func (k *kustomize) Build(path path.Path) (resource.Tree, error) {
 	c, err := ReadKustomizationFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return k.buildFromConfig(c, append(opts, WithPath(path))...)
+	return k.buildFromConfig(c, path)
 }
 
-func (k *kustomize) buildFromConfig(c *types.Kustomization, opts ...Option) (resource.Tree, error) {
-
-	o := newOptions(opts...)
-	errs := &errList{}
-	for _, r := range c.Resources {
-		tree := resource.NewTree()
-		if err := buildResource(r, o.path, tree, NewKustomize); err != nil {
-			errs.Append(err)
-			continue
+func (k *kustomize) buildResource(r string, dir path.Path, tree resource.Tree) error {
+	target := dir.Join(r)
+	if !path.IsRelative(r) {
+		var err error
+		target, err = path.Parse(r)
+		if err != nil {
+			return err
 		}
-		errs.Append(resource.CopyTree(o.tree, tree))
+	}
+	ok, err := target.IsDir()
+	if err != nil {
+		return err
+	}
+	if ok {
+		sub, err := k.Build(target)
+		if err != nil {
+			return err
+		}
+		if err := resource.CopyTree(tree, sub); err != nil {
+			return err
+		}
+		return nil
+	}
+	// read the file
+	f, err := target.Reader()
+	if err != nil {
+		return err
+	}
+	d := yaml.NewDecoder(f)
+	for {
+		var m map[string]any
+		if err := d.Decode(&m); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+		if m != nil {
+			obj := &unstructured.Unstructured{Object: m}
+			if err := tree.Insert(obj); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (k *kustomize) buildFromConfig(c *types.Kustomization, dir path.Path) (resource.Tree, error) {
+
+	tree := resource.NewTree()
+	for _, r := range c.Resources {
+		// This resource could be a relative local path, which means it needs to get
+		// joined from the provided dir, otherwise it's an absolute path and should be parsed
+		t := resource.NewTree()
+		if err := k.buildResource(r, dir, t); err != nil {
+			return nil, err
+		}
+		if err := resource.CopyTree(tree, t); err != nil {
+			return nil, err
+		}
 	}
 	for _, r := range c.Components {
-		errs.Append(buildResource(r, o.path, o.tree, NewKustomize))
+		if err := k.buildResource(r, dir, tree); err != nil {
+			return nil, err
+		}
 	}
 	// namePrefix
 	// nameSuffix
 	if len(c.NamePrefix) > 0 || len(c.NameSuffix) > 0 {
-		errs.Append(o.tree.Visit(&mutate.Name{Prefix: c.NamePrefix, Suffix: c.NameSuffix}))
+		if err := tree.Visit(&mutate.Name{Prefix: c.NamePrefix, Suffix: c.NameSuffix}); err != nil {
+			return nil, err
+		}
 	}
 	// namespace
 	if len(c.Namespace) > 0 {
-		errs.Append(o.tree.Visit(&mutate.Namespace{Name: c.Namespace}))
+		if err := tree.Visit(&mutate.Namespace{Name: c.Namespace}); err != nil {
+			return nil, err
+		}
 	}
 	// commonLabels
 	// commonAnnotations
 	if len(c.CommonAnnotations) > 0 {
 		mu := mutate.Annotations(c.CommonAnnotations)
-		errs.Append(o.tree.Visit(&mu))
+		if err := tree.Visit(&mu); err != nil {
+			return nil, err
+		}
 	}
 	// patches is either a strategicMergePatch or a json patch. I guess it's
 	// up to me to guess which one, since they deprecated the method of
 	// explicitly choosing one
 	for _, patch := range c.Patches {
-		errs.Append(kustomizePatch(o.path, patch, o.tree))
+		if err := kustomizePatch(dir, patch, tree); err != nil {
+			return nil, err
+		}
 	}
-	if !errs.Empty() {
-		return nil, errs
-	}
-	return o.tree, nil
+	return tree, nil
 }
 
 func ReadKustomizationFile(path path.Path) (*types.Kustomization, error) {
@@ -150,9 +224,4 @@ func kustomizePatch(path path.Path, patch types.Patch, tree resource.Tree) error
 	}
 	p := mutate.StrategicMergePatch(m)
 	return tree.Visit(&p, o...)
-}
-
-func init() {
-	// This package imports generate
-	generate.Register("builtin.dinghy.dev/kustomize", &KustomizeGenerator{})
 }

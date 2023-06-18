@@ -2,9 +2,7 @@ package path
 
 import (
 	"bytes"
-	"encoding/json"
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
 	"io"
 	"net/url"
 	"os"
@@ -53,22 +51,6 @@ func Reader(in impl, path string) (io.Reader, error) {
 	return bytes.NewReader(b), err
 }
 
-func UnmarshalYAML(in impl, path string, v any) error {
-	b, err := ReadBytes(in, path)
-	if err != nil {
-		return err
-	}
-	return yaml.Unmarshal(b, v)
-}
-
-func UnmarshalJSON(in impl, path string, v any) error {
-	b, err := ReadBytes(in, path)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(b, v)
-}
-
 func IsRelative(path string) bool {
 	p, err := Parse(path)
 	if err == nil {
@@ -91,7 +73,7 @@ func Parse(in string) (Path, error) {
 			return Path{}, errors.Wrapf(err, "failed to parse GitHub URL: %q", in)
 		}
 
-		owner, path, ok := strings.Cut(u.Path, "/")
+		owner, path, ok := strings.Cut(strings.TrimPrefix(u.Path, "/"), "/")
 		if !ok {
 			return Path{}, errors.Errorf("%s: %q", ErrGithubURL, in)
 		}

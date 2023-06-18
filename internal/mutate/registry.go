@@ -56,5 +56,4 @@ func init() {
 	MustRegister("builtin.dinghy.dev/metadata/annotations", &Annotations{})
 	MustRegister("builtin.dinghy.dev/metadata/labels", &Labels{})
 	MustRegister("builtin.dinghy.dev/script/js", &Script{})
-	MustRegister("builtin.dinghy.dev/metadata/name", &Name{})
 }

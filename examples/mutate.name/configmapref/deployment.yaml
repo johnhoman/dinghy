@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: foo-nginx-deployment-bar
+  name: nginx-deployment
   labels:
     app: nginx
 spec:
@@ -19,3 +19,7 @@ spec:
           image: nginx:1.14.2
           ports:
             - containerPort: 80
+      volumes:
+        - name: config-data
+          configMap:
+            name: config-data
