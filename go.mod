@@ -3,7 +3,6 @@ module github.com/johnhoman/dinghy
 go 1.20
 
 require (
-	github.com/alecthomas/jsonschema v0.0.0-20220216202328-9eeeec9d044b
 	github.com/alecthomas/kong v0.7.1
 	github.com/dop251/goja v0.0.0-20230605162241-28ee0ee714f3
 	github.com/evanphx/json-patch v4.12.0+incompatible

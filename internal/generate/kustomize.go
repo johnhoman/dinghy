@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/api/types"
 
-	"github.com/johnhoman/dinghy/internal/codec"
 	"github.com/johnhoman/dinghy/internal/context"
 	"github.com/johnhoman/dinghy/internal/mutate"
 	"github.com/johnhoman/dinghy/internal/path"
@@ -200,7 +199,7 @@ func kustomizePatch(path path.Path, patch types.Patch, tree resource.Tree) error
 	// TODO: read the json patch spec
 	var jp mutate.JSONPatch
 	// try jsonpatch first, if it doesn't decode, assume it's a strategicMergePatch
-	if err = codec.YAMLDecoder(bytes.NewReader(raw)).Decode(&jp); err == nil {
+	if err = yaml.NewDecoder(bytes.NewReader(raw)).Decode(&jp); err == nil {
 		return tree.Visit(&jp)
 	}
 	var mergePatch mutate.StrategicMergePatch

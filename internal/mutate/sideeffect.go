@@ -1,7 +1,8 @@
 package mutate
 
 import (
-	"github.com/johnhoman/dinghy/internal/codec"
+	"gopkg.in/yaml.v3"
+
 	"github.com/johnhoman/dinghy/internal/resource"
 )
 
@@ -23,7 +24,7 @@ type sideEffectVisitor struct {
 // and the resource tree to the SideEffect visitor
 func (se *sideEffectVisitor) Visit(obj *resource.Object) error {
 	var m map[string]any
-	if err := codec.YAMLCopyTo(&m, obj.Object); err != nil {
+	if err := copyResource(&m, obj.Object); err != nil {
 		return err
 	}
 	if err := se.visitor.Visit(obj); err != nil {
@@ -31,4 +32,12 @@ func (se *sideEffectVisitor) Visit(obj *resource.Object) error {
 	}
 	objBefore := resource.Unstructured(m)
 	return se.visitor.SideEffect(objBefore, se.tree)
+}
+
+func copyResource(to any, from any) error {
+	data, err := yaml.Marshal(from)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal(data, to)
 }

@@ -3,17 +3,18 @@ package build
 import (
 	"bytes"
 	"fmt"
-	"github.com/johnhoman/dinghy/internal/codec"
+	"strings"
+
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/johnhoman/dinghy/internal/context"
 	"github.com/johnhoman/dinghy/internal/generate"
 	"github.com/johnhoman/dinghy/internal/mutate"
 	"github.com/johnhoman/dinghy/internal/path"
 	"github.com/johnhoman/dinghy/internal/resource"
 	"github.com/johnhoman/dinghy/internal/types"
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v3"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"strings"
 )
 
 const (
@@ -215,7 +216,7 @@ func ReadDinghyFile(p path.Path) (*types.Config, error) {
 		return nil, err
 	}
 	c := &types.Config{}
-	return c, codec.YAMLDecoder(bytes.NewReader(data)).Decode(c)
+	return c, yaml.NewDecoder(bytes.NewReader(data)).Decode(c)
 }
 
 func parseKind(kind string) schema.GroupVersionKind {

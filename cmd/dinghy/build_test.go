@@ -18,6 +18,7 @@ import (
 )
 
 func TestCmdBuild_Run(t *testing.T) {
+
 	afs := afero.NewOsFs()
 	examples := "../../examples/"
 

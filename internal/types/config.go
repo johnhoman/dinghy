@@ -1,11 +1,17 @@
 package types
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/johnhoman/dinghy/internal/codec"
+	"gopkg.in/yaml.v3"
+	"sort"
+
 	"github.com/johnhoman/dinghy/internal/generate"
 	"github.com/johnhoman/dinghy/internal/mutate"
-	"sort"
+)
+
+var (
+	_ yaml.Unmarshaler = &Config{}
 )
 
 const (
@@ -75,10 +81,6 @@ type (
 	ValidationSpec = PluginSpec
 )
 
-var (
-	_ codec.Validator = &Config{}
-)
-
 type Config struct {
 	APIVersion string `yaml:"apiVersion" dinghy:"required"`
 	Kind       string `yaml:"kind" dinghy:"required"`
@@ -90,7 +92,24 @@ type Config struct {
 	Validations []ValidationSpec `yaml:"validate"`
 }
 
-func (c *Config) Validate() []string {
+func (c *Config) UnmarshalYAML(value *yaml.Node) error {
+	var in struct {
+		APIVersion string `yaml:"apiVersion"`
+		Kind       string `yaml:"kind"`
+
+		Resources   []string         `yaml:"resources"`
+		Overlays    []string         `yaml:"overlays"`
+		Generators  []GeneratorSpec  `yaml:"generate"`
+		Mutations   []MutationSpec   `yaml:"mutate"`
+		Validations []ValidationSpec `yaml:"validate"`
+	}
+	var m map[string]any
+	if err := value.Decode(&m); err != nil {
+		return err
+	}
+	if err := copyMapToStruct(&in, m); err != nil {
+		return err
+	}
 
 	errs := make([]string, 0)
 	for k, gen := range c.Generators {
@@ -114,6 +133,10 @@ func (c *Config) Validate() []string {
 			continue
 		}
 	}
+	c.Resources = in.Resources
+	c.Overlays = in.Overlays
+	c.Mutations = in.Mutations
+	c.Generators = in.Generators
 	return nil
 }
 
@@ -163,4 +186,14 @@ func WithResource(path string) ConfigOption {
 	return func(o *Config) {
 		o.AddResource(path)
 	}
+}
+
+func copyMapToStruct(to any, from map[string]any) error {
+	buf := new(bytes.Buffer)
+	if err := yaml.NewEncoder(buf).Encode(from); err != nil {
+		return err
+	}
+	d := yaml.NewDecoder(buf)
+	d.KnownFields(true)
+	return d.Decode(to)
 }

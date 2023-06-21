@@ -1,7 +1,7 @@
 package resource
 
 import (
-	"github.com/johnhoman/dinghy/internal/codec"
+	"gopkg.in/yaml.v3"
 	"io"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -11,7 +11,7 @@ func CopyTree(to, from Tree) error {
 }
 
 func PrintTree(tree Tree, w io.Writer) error {
-	return tree.Visit(printTree(codec.YAMLEncoder(w)))
+	return tree.Visit(printTree(yaml.NewEncoder(w)))
 }
 
 func copyTree(to Tree) Visitor {
@@ -20,7 +20,7 @@ func copyTree(to Tree) Visitor {
 	})
 }
 
-func printTree(e codec.Encoder) Visitor {
+func printTree(e *yaml.Encoder) Visitor {
 	return VisitorFunc(func(obj *Object) error {
 		return e.Encode(obj.Object)
 	})

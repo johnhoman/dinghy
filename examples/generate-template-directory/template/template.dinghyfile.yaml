@@ -1,0 +1,7 @@
+apiVersion: dinghy.dev/v1alpha1
+kind: Template
+templates:
+- serviceaccount.yaml.tmpl
+values:
+  appName: nginx
+  appNamespace: default

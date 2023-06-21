@@ -2,6 +2,7 @@ package generate
 
 import (
 	"bytes"
+	"github.com/imdario/mergo"
 	"github.com/invopop/jsonschema"
 	"text/template"
 
@@ -85,34 +86,104 @@ func (t *Template) Emit(ctx *context.Context) (resource.Tree, error) {
 		}
 		source = root.Join(source.String())
 	}
+
+	templates, vars, err := templateBuildDir(source)
+	if err != nil {
+		return nil, err
+	}
+
+	values := t.values
+	if values == nil {
+		values = make(map[string]any)
+	}
+	if err = mergo.Merge(&values, vars); err != nil {
+		return nil, err
+	}
+
 	// the root will likely be a directory and not a single file, but
 	// we should be able to handle either
 	rv := resource.NewList()
+	for _, content := range templates {
+		tmpl, err := template.New(source.String()).Option(templateOptionErrOnMissingKey).Parse(content)
+		if err != nil {
+			return nil, err
+		}
 
-	isDir, err := source.IsDir()
+		buf := new(bytes.Buffer)
+		if err = tmpl.Execute(buf, values); err != nil {
+			return nil, err
+		}
+		if err := resource.InsertFromReader(rv, buf); err != nil {
+			return nil, err
+		}
+	}
+	return rv, nil
+}
+
+func templateReadConfig(source path.Path) (TemplateConfig, error) {
+	c := TemplateConfig{}
+
+	f, err := source.Reader("template.dinghyfile.yaml")
 	if err != nil {
-		return nil, err
+		return c, err
 	}
+	return c, yaml.NewDecoder(f).Decode(&c)
+}
 
-	if isDir {
-		// Now I have to list everything under this directory -- need to example
-		// path to include list dir
-		panic("not implemented: directories are current not supported")
-	}
-
-	content, err := source.ReadText()
+func templateBuildDir(source path.Path) (templates []string, vars map[string]any, err error) {
+	var c TemplateConfig
+	c, err = templateReadConfig(source)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	tmpl, err := template.New(source.String()).Option(templateOptionErrOnMissingKey).Parse(content)
-	if err != nil {
-		return nil, err
-	}
+	vars = c.Values
 
-	buf := new(bytes.Buffer)
-	if err = tmpl.Execute(buf, t.values); err != nil {
-		return nil, err
+	var src path.Path
+	for _, res := range c.Templates {
+		src, err = path.Parse(res)
+		if err != nil {
+			return
+		}
+		if src.Relative() {
+			src = source.Join(res)
+		}
+
+		var ok bool
+		ok, err = src.IsDir()
+		if err != nil {
+			return
+		}
+		if ok {
+			var (
+				items []string
+				defs  map[string]any
+			)
+
+			items, defs, err = templateBuildDir(src)
+			if err != nil {
+				return
+			}
+			templates = append(templates, items...)
+			if err = mergo.Merge(&vars, defs); err != nil {
+				return
+			}
+			continue
+		}
+
+		var s string
+		s, err = src.ReadText()
+		if err != nil {
+			return
+		}
+		templates = append(templates, s)
 	}
-	return rv, resource.InsertFromReader(rv, buf)
+	return
+}
+
+type TemplateConfig struct {
+	APIVersion string         `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string         `json:"kind" yaml:"kind"`
+	Templates  []string       `json:"templates" yaml:"templates"`
+	Values     map[string]any `json:"values" yaml:"values"`
 }

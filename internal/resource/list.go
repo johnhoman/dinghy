@@ -21,7 +21,7 @@ type List struct {
 
 func (l *List) Visit(visitor Visitor, opts ...MatchOption) error {
 	l.mu.RLock()
-	defer l.mu.Unlock()
+	defer l.mu.RUnlock()
 	for _, obj := range l.objs {
 		if obj.Matches(opts...) {
 			if err := visitor.Visit(obj); err != nil {
