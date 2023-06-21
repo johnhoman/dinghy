@@ -27,8 +27,8 @@ func Has(name string) bool {
 // will be up to the Mutator to convert the config to the correct type. The registry
 // will handle deserializing YAML into the returned config when the Mutator plugin
 // is invoked
-func Register(name string, f Generator) {
-	r.store[name] = func() any {
+func Register(f Generator) {
+	r.store[f.Name()] = func() any {
 		t := reflect.TypeOf(f).Elem()
 		return reflect.New(t).Interface()
 	}
@@ -43,6 +43,6 @@ var r = &registry{store: make(map[string]func() any)}
 func init() {
 	// only visitors can traverse the Tree, so the mutator registry should reference
 	// visitors, and all the visitors can live in the visitor.
-	Register("builtin.dinghy.dev/service", &Service{})
-	Register("builtin.dinghy.dev/kustomize", &Kustomize{})
+	Register(&Kustomize{})
+	Register(&Template{})
 }

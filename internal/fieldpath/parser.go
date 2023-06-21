@@ -1,12 +1,26 @@
 package fieldpath
 
 import (
-	"io"
-
 	"github.com/pkg/errors"
+	"io"
 )
 
-// Parse the string representation into a FieldPath
+// MustParse parses a string representation of a field path and returns a FieldPath object.
+// If the parsing fails, it panics.
+//
+// It is important to note that MustParse should only be used when you are certain
+// that the provided field path string is valid. If there is a possibility of invalid
+// input, it is recommended to use the Parse function instead, which returns an error
+// instead of panicking.
+func MustParse(in string) *FieldPath {
+	fp, err := Parse(in)
+	if err != nil {
+		panic(err)
+	}
+	return fp
+}
+
+// Parse the string representation into a FieldPath.
 func Parse(fp string) (*FieldPath, error) {
 	return parseFieldPath(fp)
 }

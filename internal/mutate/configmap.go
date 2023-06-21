@@ -1,10 +1,13 @@
 package mutate
 
 import (
+	"bytes"
 	"encoding/json"
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/johnhoman/dinghy/internal/resource"
 	"github.com/johnhoman/dinghy/internal/visitor"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -12,14 +15,53 @@ const (
 	ErrKeyError = "the requested key could not be found"
 )
 
+var (
+	_ Mutator          = &ConfigMapJSONPatch{}
+	_ resource.Visitor = &ConfigMapJSONPatch{}
+)
+
 type ConfigMapJSONPatch struct {
 	// Key is the config map key to patch. The value
 	// at the provided key will be decoded into
-	Key   string `yaml:"key" dinghy:"required"`
-	Patch []any  `yaml:"patch" dinghy:"required"`
+	Key   string          `yaml:"key"`
+	Patch jsonpatch.Patch `yaml:"patch"`
 }
 
-func (c *ConfigMapJSONPatch) Visit(obj *unstructured.Unstructured) error {
+func (c *ConfigMapJSONPatch) Name() string {
+	return "builtin.dinghy.dev/jsonpatch/configmap"
+}
+
+func (c *ConfigMapJSONPatch) UnmarshalYAML(value *yaml.Node) error {
+	var in struct {
+		Key   string `yaml:"key"`
+		Patch []any  `yaml:"patch"`
+	}
+
+	var m map[string]any
+	if err := value.Decode(&m); err != nil {
+		return err
+	}
+	data, _ := yaml.Marshal(m)
+	d := yaml.NewDecoder(bytes.NewReader(data))
+	d.KnownFields(true)
+	if err := d.Decode(&in); err != nil {
+		return err
+	}
+
+	var patch jsonpatch.Patch
+	data, err := json.Marshal(in.Patch)
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(data, &patch); err != nil {
+		return err
+	}
+	c.Key = in.Key
+	c.Patch = patch
+	return nil
+}
+
+func (c *ConfigMapJSONPatch) Visit(obj *resource.Object) error {
 	raw, err := json.Marshal(c.Patch)
 	if err != nil {
 		return err

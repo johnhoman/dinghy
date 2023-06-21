@@ -3,17 +3,22 @@ package mutate
 import (
 	"encoding/json"
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/johnhoman/dinghy/internal/resource"
 	"gopkg.in/yaml.v3"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	"github.com/johnhoman/dinghy/internal/visitor"
 )
 
 var (
 	_ yaml.Unmarshaler = &JSONPatch{}
+	_ Mutator          = &JSONPatch{}
 )
 
-type JSONPatch jsonpatch.Patch
+type JSONPatch struct {
+	patch jsonpatch.Patch
+}
+
+func (j *JSONPatch) Name() string {
+	return "builtin.dinghy.dev/jsonpatch"
+}
 
 func (j *JSONPatch) UnmarshalYAML(value *yaml.Node) error {
 	// the json patch type has a json.RawMessage field that yaml
@@ -28,9 +33,9 @@ func (j *JSONPatch) UnmarshalYAML(value *yaml.Node) error {
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(raw, j)
+	return json.Unmarshal(raw, &j.patch)
 }
 
-func (j *JSONPatch) Visit(obj *unstructured.Unstructured) error {
-	return visitor.JSONPatch(jsonpatch.Patch(*j)).Visit(obj)
+func (j *JSONPatch) Visit(obj *resource.Object) error {
+	return obj.JSONPatch(j.patch)
 }

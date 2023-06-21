@@ -1,22 +1,17 @@
 package resource
 
-import (
-	"github.com/johnhoman/dinghy/internal/visitor"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-)
-
 var (
 	_ Tree = &treeNode{}
 )
 
 type Tree interface {
-	Visit(visitor visitor.Visitor, opts ...MatchOption) error
-	// Insert an object into the tree
-	Insert(obj *unstructured.Unstructured) error
+	Visit(visitor Visitor, opts ...MatchOption) error
+	// Insert an Object into the tree
+	Insert(obj *Object) error
 	// Pop returns the resource associated with the resource key and removes.
 	// the resource from the tree. ErrNotFound will be returned if the key
 	// isn't found
-	Pop(key Key) (*unstructured.Unstructured, error)
+	Pop(key Key) (*Object, error)
 }
 
 // NewTree returns a new tree for managing Kubernetes resource
@@ -28,7 +23,7 @@ func NewTree() Tree {
 // ParseKey creates a resource key from the provided resource. The
 // resource key uniquely identifies a resource in a resource Tree. Keys
 // can be used to query toe Tree using Tree.Pop()
-func ParseKey(obj *unstructured.Unstructured) Key {
+func ParseKey(obj *Object) Key {
 	return Key{
 		GroupVersion: obj.GetAPIVersion(),
 		Kind:         obj.GetKind(),
@@ -39,7 +34,7 @@ func ParseKey(obj *unstructured.Unstructured) Key {
 
 // GetResource returns a resource from the tree without changing the state of
 // the Tree.
-func GetResource(tree Tree, key Key) (*unstructured.Unstructured, error) {
+func GetResource(tree Tree, key Key) (*Object, error) {
 	obj, err := tree.Pop(key)
 	if err != nil {
 		return nil, err

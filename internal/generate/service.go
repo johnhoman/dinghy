@@ -4,11 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"github.com/johnhoman/dinghy/internal/context"
-	"io"
 	"text/template"
-
-	"gopkg.in/yaml.v3"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/johnhoman/dinghy/internal/resource"
 )
@@ -34,22 +30,5 @@ func (s *Service) Emit(ctx *context.Context) (resource.Tree, error) {
 	if err := tmpl.Execute(buf, s); err != nil {
 		return nil, err
 	}
-	d := yaml.NewDecoder(buf)
-	for {
-		var m map[string]any
-		if err := d.Decode(&m); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-		if m == nil {
-			continue
-		}
-		obj := &unstructured.Unstructured{Object: m}
-		if err := tree.Insert(obj); err != nil {
-			return nil, err
-		}
-	}
-	return tree, nil
+	return tree, resource.InsertFromReader(tree, buf)
 }

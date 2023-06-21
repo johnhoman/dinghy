@@ -50,3 +50,7 @@ func (bp Path) Reader(path ...string) (io.Reader, error) {
 func (bp Path) String(path ...string) string {
 	return bp.path.toString(bp.root, path...)
 }
+
+func (bp Path) Relative() bool {
+	return IsRelative(bp.root)
+}

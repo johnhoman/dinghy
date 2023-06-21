@@ -1,1 +1,7 @@
-{}
+Deployment.apps:
+- spec/template/metadata/labels
+- spec/selector/matchLabels
+- metadata/labels
+Service:
+- spec/selector
+- metadata/labels

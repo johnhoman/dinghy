@@ -10,11 +10,8 @@ import (
 	"github.com/johnhoman/dinghy/internal/path"
 	"github.com/johnhoman/dinghy/internal/resource"
 	"github.com/johnhoman/dinghy/internal/types"
-	"github.com/johnhoman/dinghy/internal/visitor"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
-	"io"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"strings"
 )
@@ -114,7 +111,7 @@ func (d *dinghy) BuildFromConfig(ctx *context.Context, c *types.Config, opts ...
 		if err = d.Decode(typed); err != nil {
 			return nil, err
 		}
-		vis := typed.(visitor.Visitor)
+		vis := typed.(resource.Visitor)
 
 		kinds := make([]schema.GroupVersionKind, 0)
 		for _, kind := range m.Selector.Kinds {
@@ -172,24 +169,7 @@ func (d *dinghy) buildResource(ctx *context.Context, r string, root path.Path, t
 	if err != nil {
 		return err
 	}
-	dec := yaml.NewDecoder(f)
-	for {
-		var m map[string]any
-		if err := dec.Decode(&m); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-		if m == nil {
-			continue
-		}
-		obj := &unstructured.Unstructured{Object: m}
-		if err = tree.Insert(obj); err != nil {
-			return err
-		}
-	}
-	return nil
+	return resource.InsertFromReader(tree, f)
 }
 
 func (d *dinghy) doGenerate(ctx *context.Context, spec types.GeneratorSpec) (resource.Tree, error) {

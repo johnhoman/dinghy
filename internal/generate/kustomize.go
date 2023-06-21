@@ -6,10 +6,8 @@ import (
 	"os"
 	"strings"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/api/types"
@@ -23,6 +21,10 @@ import (
 
 type Kustomize struct {
 	Source string `yaml:"source"`
+}
+
+func (c *Kustomize) Name() string {
+	return "builtin.dinghy.dev/kustomize"
 }
 
 // Emit a kustomization package tree
@@ -90,23 +92,7 @@ func (k *kustomize) buildResource(r string, dir path.Path, tree resource.Tree) e
 	if err != nil {
 		return err
 	}
-	d := yaml.NewDecoder(f)
-	for {
-		var m map[string]any
-		if err := d.Decode(&m); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return err
-		}
-		if m != nil {
-			obj := &unstructured.Unstructured{Object: m}
-			if err := tree.Insert(obj); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return resource.InsertFromReader(tree, f)
 }
 
 func (k *kustomize) buildFromConfig(c *types.Kustomization, dir path.Path) (resource.Tree, error) {
@@ -137,7 +123,7 @@ func (k *kustomize) buildFromConfig(c *types.Kustomization, dir path.Path) (reso
 	}
 	// namespace
 	if len(c.Namespace) > 0 {
-		if err := tree.Visit(&mutate.Namespace{Name: c.Namespace}); err != nil {
+		if err := tree.Visit(&mutate.Namespace{Namespace: c.Namespace}); err != nil {
 			return nil, err
 		}
 	}
@@ -212,16 +198,14 @@ func kustomizePatch(path path.Path, patch types.Patch, tree resource.Tree) error
 	}
 
 	// TODO: read the json patch spec
-	var jp jsonpatch.Patch
+	var jp mutate.JSONPatch
 	// try jsonpatch first, if it doesn't decode, assume it's a strategicMergePatch
 	if err = codec.YAMLDecoder(bytes.NewReader(raw)).Decode(&jp); err == nil {
-		patch := mutate.JSONPatch(jp)
-		return tree.Visit(&patch)
+		return tree.Visit(&jp)
 	}
-	var m map[string]any
-	if err := yaml.Unmarshal(raw, &m); err != nil {
+	var mergePatch mutate.StrategicMergePatch
+	if err := yaml.Unmarshal(raw, &mergePatch); err != nil {
 		return err
 	}
-	p := mutate.StrategicMergePatch(m)
-	return tree.Visit(&p, o...)
+	return tree.Visit(&mergePatch, o...)
 }

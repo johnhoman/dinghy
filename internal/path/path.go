@@ -64,6 +64,14 @@ func IsRelative(path string) bool {
 	return false
 }
 
+func MustParse(in string) Path {
+	parsed, err := Parse(in)
+	if err != nil {
+		panic(err)
+	}
+	return parsed
+}
+
 // Parse an input path. Paths can be URLs, s3 paths, or local paths
 func Parse(in string) (Path, error) {
 	switch {
@@ -78,8 +86,8 @@ func Parse(in string) (Path, error) {
 			return Path{}, errors.Errorf("%s: %q", ErrGithubURL, in)
 		}
 
-		repo, path, ok := strings.Cut(path, "/")
-		if !ok {
+		repo, path, _ := strings.Cut(path, "/")
+		if repo == "" {
 			return Path{}, errors.Errorf("%s: %q", ErrGithubURL, in)
 		}
 		ref := u.Query().Get("ref")

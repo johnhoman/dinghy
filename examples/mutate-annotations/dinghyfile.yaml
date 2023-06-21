@@ -11,6 +11,9 @@ mutate:
   with:
     script: |
       function mutate(o, c) {
+        if (o.metadata.annotations === undefined) {
+          o.metadata.annotations = {}
+        }
         o.metadata.annotations["dinghy.dev/script"] = `Hello, ${c.params.name}!`
       }
     config:

@@ -6,11 +6,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"github.com/johnhoman/dinghy/internal/visitor"
 )
 
 var (
@@ -25,27 +22,31 @@ var (
 // for resources on selection.
 type treeNode struct {
 	nodes map[string]*treeNode
-	obj   *unstructured.Unstructured
+	obj   *Object
 }
 
-func (tree *treeNode) Visit(visitor visitor.Visitor, opts ...MatchOption) error {
+func (tree *treeNode) Visit(visitor Visitor, opts ...MatchOption) error {
 	o := newOptions(opts...)
-	if len(o.matchLabels) > 0 {
-		visitor = matchLabels(o.matchLabels, visitor)
-	}
 	// the replacer visitor resets a node in the tree if
 	// any of the identifying information changes
 	visitor = replaceVisitor(tree, visitor)
-
-	if o.namespaces.Len() == 0 {
-		o.namespaces.Insert("*")
+	if len(o.matchLabels) > 0 {
+		visitor = matchLabels(o.matchLabels, visitor)
 	}
-	if o.names.Len() == 0 {
-		o.names.Insert("*")
+	if len(o.matchAnnotations) > 0 {
+		visitor = matchAnnotations(o.matchAnnotations, visitor)
 	}
 
 	if o.kinds.Len() == 0 {
 		o.kinds.Insert(schema.GroupVersionKind{Group: "*", Version: "*", Kind: "*"})
+	}
+
+	if o.namespaces.Len() == 0 {
+		o.namespaces.Insert("*")
+	}
+
+	if o.names.Len() == 0 {
+		o.names.Insert("*")
 	}
 
 	errs := make([]error, 0)
@@ -75,19 +76,19 @@ func (tree *treeNode) path(key Key) []string {
 
 // Insert a resource into the treeNode. If a resource already exists in the tree
 // and the resource content is different, and error will be returned.
-func (tree *treeNode) Insert(obj *unstructured.Unstructured) error {
+func (tree *treeNode) Insert(obj *Object) error {
 	err := tree.insert(obj, tree.path(newResourceKey(obj))...)
 	return errors.Wrapf(err, "%s: %s", ErrInsertResource, treeError(obj))
 }
 
 // Pop finds, removes, and returns a resource from the treeNode. If the resource
 // doesn't exist, ErrNotFound will be returned
-func (tree *treeNode) Pop(key Key) (*unstructured.Unstructured, error) {
+func (tree *treeNode) Pop(key Key) (*Object, error) {
 	obj, err := tree.pop(tree.path(key)...)
 	return obj, errors.Wrapf(err, "%s: %s", ErrPopResource, key.String())
 }
 
-func (tree *treeNode) visitNodes(visitor visitor.Visitor, path ...string) error {
+func (tree *treeNode) visitNodes(visitor Visitor, path ...string) error {
 	errs := make([]error, 0)
 	for _, node := range tree.nodes {
 		if err := node.visit(visitor, path...); err != nil {
@@ -100,7 +101,7 @@ func (tree *treeNode) visitNodes(visitor visitor.Visitor, path ...string) error 
 	return nil
 }
 
-func (tree *treeNode) insert(obj *unstructured.Unstructured, path ...string) error {
+func (tree *treeNode) insert(obj *Object, path ...string) error {
 	if len(path) == 0 {
 		if tree.obj != nil && !reflect.DeepEqual(obj, tree.obj) {
 			return ErrResourceConflict
@@ -121,7 +122,7 @@ func (tree *treeNode) empty() bool {
 
 // pop removes and returns the child element at path if it exists. If
 // it doesn't exit ErrNotFound is returned
-func (tree *treeNode) pop(path ...string) (*unstructured.Unstructured, error) {
+func (tree *treeNode) pop(path ...string) (*Object, error) {
 	if len(path) == 0 {
 		if tree.obj == nil {
 			return nil, ErrNotFound
@@ -152,7 +153,7 @@ func (tree *treeNode) pop(path ...string) (*unstructured.Unstructured, error) {
 	return obj, nil
 }
 
-func (tree *treeNode) visit(visitor visitor.Visitor, path ...string) error {
+func (tree *treeNode) visit(visitor Visitor, path ...string) error {
 	if len(path) == 0 {
 		if tree.obj == nil {
 			return nil
@@ -173,10 +174,11 @@ func (tree *treeNode) visit(visitor visitor.Visitor, path ...string) error {
 
 func newOptions(opts ...MatchOption) *matchOptions {
 	o := &matchOptions{
-		kinds:       sets.New[schema.GroupVersionKind](),
-		names:       sets.New[string](),
-		namespaces:  sets.New[string](),
-		matchLabels: make(map[string]string),
+		kinds:            sets.New[schema.GroupVersionKind](),
+		names:            sets.New[string](),
+		namespaces:       sets.New[string](),
+		matchLabels:      make(map[string]string),
+		matchAnnotations: make(map[string]string),
 	}
 	for _, f := range opts {
 		f(o)
@@ -184,28 +186,6 @@ func newOptions(opts ...MatchOption) *matchOptions {
 	return o
 }
 
-// replaceVisitor wraps a visitor and checks to see if the visitor changed the key. If the
-// visitor changed the key, it reinserts the resource in the tree
-func replaceVisitor(tree *treeNode, next visitor.Visitor) visitor.Visitor {
-	return visitor.Func(func(obj *unstructured.Unstructured) error {
-		key := newResourceKey(obj)
-		// visit the node
-		if err := next.Visit(obj); err != nil {
-			return err
-		}
-		if newResourceKey(obj) != key {
-			// the resource key changed, so we need to reinsert it into the
-			// tree, so that it can be found again
-			u, err := tree.Pop(key)
-			if err != nil {
-				return err
-			}
-			return tree.Insert(u)
-		}
-		return nil
-	})
-}
-
-func treeError(obj *unstructured.Unstructured) string {
+func treeError(obj *Object) string {
 	return newResourceKey(obj).String()
 }

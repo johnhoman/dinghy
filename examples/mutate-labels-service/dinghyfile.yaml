@@ -1,7 +1,7 @@
 apiVersion: dinghy.dev/v1alpha1
 kind: Config
 resources:
-- deployment.yaml
+- service.yaml
 mutate:
 - uses: builtin.dinghy.dev/matchLabels
   with:

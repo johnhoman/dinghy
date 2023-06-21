@@ -1,6 +1,7 @@
 package fieldpath
 
 import (
+	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 	"io"
 	"strconv"
@@ -55,6 +56,10 @@ type FieldPath struct {
 }
 
 func (fp *FieldPath) SetValue(m map[string]any, value any) error {
+	return fp.MergeValue(m, value, false)
+}
+
+func (fp *FieldPath) MergeValue(m map[string]any, value any, merge bool) error {
 	if len(fp.indexes) == 0 {
 		return nil
 	}
@@ -70,6 +75,10 @@ func (fp *FieldPath) SetValue(m map[string]any, value any) error {
 				return errors.Errorf("expected type `map[string]any{}`, got `%T`", current)
 			}
 			if end {
+				if merge {
+					return mergo.Merge(mapping[index.index], value,
+						mergo.WithOverride, mergo.WithAppendSlice)
+				}
 				mapping[index.index] = value
 				return nil
 			}

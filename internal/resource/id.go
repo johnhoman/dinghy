@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func newResourceKey(obj *unstructured.Unstructured) Key {
+func newResourceKey(obj *Object) Key {
 	gvk := obj.GroupVersionKind()
 	name := obj.GetName()
 	key := Key{

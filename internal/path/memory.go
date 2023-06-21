@@ -1,7 +1,6 @@
 package path
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
@@ -15,7 +14,7 @@ func NewMemory() Memory {
 type Memory map[string]any
 
 func (m Memory) toString(root string, segments ...string) string {
-	return fmt.Sprintf("memory://%s", m.join(root, segments...))
+	return m.join(root, segments...)
 }
 
 func (m Memory) ReadFile(path string) ([]byte, error) {

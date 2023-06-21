@@ -1,7 +1,7 @@
 package mutate
 
 import (
-	"github.com/johnhoman/dinghy/internal/visitor"
+	"github.com/johnhoman/dinghy/internal/resource"
 	"github.com/pkg/errors"
 	"reflect"
 )
@@ -9,6 +9,11 @@ import (
 var (
 	ErrNotFound = errors.New("mutator not found")
 )
+
+type Mutator interface {
+	resource.Visitor
+	Name() string
+}
 
 func Get(name string) (any, error) {
 	f, ok := r.store[name]
@@ -28,12 +33,8 @@ func Has(name string) bool {
 // will be up to the Mutator to convert the config to the correct type. The registry
 // will handle deserializing YAML into the returned config when the Mutator plugin
 // is invoked
-func MustRegister(name string, vis any) {
-	_, ok := vis.(visitor.Visitor)
-	if !ok {
-		panic("why why why")
-	}
-	r.store[name] = func() any {
+func MustRegister(vis Mutator) {
+	r.store[vis.Name()] = func() any {
 		t := reflect.TypeOf(vis).Elem()
 		return reflect.New(t).Interface()
 	}
@@ -46,14 +47,16 @@ type registry struct {
 var r = &registry{store: make(map[string]func() any)}
 
 func init() {
-	MustRegister("builtin.dinghy.dev/strategicMergePatch", &StrategicMergePatch{})
-	MustRegister("builtin.dinghy.dev/jsonpatch", &JSONPatch{})
-	MustRegister("builtin.dinghy.dev/jsonpatch/configmap", &ConfigMapJSONPatch{})
-	MustRegister("builtin.dinghy.dev/patch", &Patch{})
-	MustRegister("builtin.dinghy.dev/metadata", &Metadata{})
-	MustRegister("builtin.dinghy.dev/metadata/name", &Name{})
-	MustRegister("builtin.dinghy.dev/metadata/namespace", &Namespace{})
-	MustRegister("builtin.dinghy.dev/metadata/annotations", &Annotations{})
-	MustRegister("builtin.dinghy.dev/metadata/labels", &Labels{})
-	MustRegister("builtin.dinghy.dev/script/js", &Script{})
+	MustRegister(&StrategicMergePatch{})
+	MustRegister(&MergePatch{})
+	MustRegister(&JSONPatch{})
+	MustRegister(&ConfigMapJSONPatch{})
+	MustRegister(&Patch{})
+	MustRegister(&Metadata{})
+	MustRegister(&Name{})
+	MustRegister(&Namespace{})
+	MustRegister(&Annotations{})
+	MustRegister(&Labels{})
+	MustRegister(&MatchLabels{})
+	MustRegister(&Script{})
 }

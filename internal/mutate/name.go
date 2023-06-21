@@ -5,7 +5,10 @@ import (
 	"github.com/johnhoman/dinghy/internal/resource"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
+
+var (
+	_ Mutator = &Name{}
 )
 
 // Name mutates the name on a resource and any resources that may
@@ -15,9 +18,13 @@ type Name struct {
 	Suffix string `yaml:"suffix"`
 }
 
+func (n *Name) Name() string {
+	return "builtin.dinghy.dev/metadata/name"
+}
+
 // Visit sets the prefix and suffix on the metadata.name attribute
 // of provided object.
-func (n *Name) Visit(obj *unstructured.Unstructured) error {
+func (n *Name) Visit(obj *resource.Object) error {
 	l := obj.GetLabels()
 	if name, ok := l["app.kubernetes.io/name"]; ok && name == obj.GetName() {
 		l["app.kubernetes.io/name"] = n.newName(obj)
@@ -34,12 +41,12 @@ func (n *Name) Visit(obj *unstructured.Unstructured) error {
 // resource by name, such as a deployment referencing a configmap. If a ConfigMap
 // name is changed, any Deployments, StatefulSets, pods, DaemonSets, ..., etc that
 // reference it will also need to change the reference name
-func (n *Name) SideEffect(old *unstructured.Unstructured, tree resource.Tree) error {
+func (n *Name) SideEffect(old *resource.Object, tree resource.Tree) error {
 	key := old.GroupVersionKind().GroupKind().String()
 	return tree.Visit(newDeepSet(n.newName(old), old.GetName(), nameRefs[key]))
 }
 
-func (n *Name) newName(obj *unstructured.Unstructured) string {
+func (n *Name) newName(obj *resource.Object) string {
 	return n.Prefix + obj.GetName() + n.Suffix
 }
 

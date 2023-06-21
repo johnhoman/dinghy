@@ -7,6 +7,7 @@ import (
 
 type Generator interface {
 	Emit(ctx *context.Context) (resource.Tree, error)
+	Name() string
 }
 
 type Func func() (resource.Tree, error)

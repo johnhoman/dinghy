@@ -3,26 +3,24 @@ package resource
 import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp"
-	"github.com/johnhoman/dinghy/internal/visitor"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"testing"
 )
 
 func TestTreeNode_Insert(t *testing.T) {
 	tests := map[string]struct {
-		obj *unstructured.Unstructured
+		obj *Object
 		key Key
 	}{
 		"RoundTripInsertPop": {
-			obj: &unstructured.Unstructured{Object: map[string]any{
+			obj: Unstructured(map[string]any{
 				"apiVersion": "v1",
 				"kind":       "Pod",
 				"metadata": map[string]any{
 					"name":      "p1",
 					"namespace": "n1",
 				},
-			}},
+			}),
 			key: Key{
 				GroupVersion: "v1",
 				Kind:         "Pod",
@@ -37,30 +35,28 @@ func TestTreeNode_Insert(t *testing.T) {
 			qt.Assert(t, tree.Insert(tt.obj), qt.IsNil)
 			obj, err := tree.Pop(tt.key)
 			qt.Assert(t, err, qt.IsNil)
-			qt.Assert(t, obj, qt.DeepEquals, obj)
+			qt.Assert(t, obj.Object, qt.DeepEquals, tt.obj.Object)
 		})
 	}
 }
 
 func TestTreeNode_Visit(t *testing.T) {
 	tests := map[string]struct {
-		initObjs []*unstructured.Unstructured
+		initObjs []*Object
 		options  []MatchOption
 		// want is a list of names that were matched on
 		want sets.Set[string]
 	}{
 		"MatchNames": {
-			initObjs: []*unstructured.Unstructured{
-				{
-					Object: map[string]any{
-						"apiVersion": "v1",
-						"kind":       "Pod",
-						"metadata": map[string]any{
-							"name":      "p1",
-							"namespace": "n1",
-						},
+			initObjs: []*Object{
+				Unstructured(map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "p1",
+						"namespace": "n1",
 					},
-				},
+				}),
 			},
 			options: []MatchOption{
 				MatchNames("p1"),
@@ -69,8 +65,8 @@ func TestTreeNode_Visit(t *testing.T) {
 		},
 	}
 
-	v := func(set sets.Set[string]) visitor.Visitor {
-		return visitor.Func(func(obj *unstructured.Unstructured) error {
+	v := func(set sets.Set[string]) Visitor {
+		return VisitorFunc(func(obj *Object) error {
 			set.Insert(newResourceKey(obj).String())
 			return nil
 		})
@@ -82,8 +78,7 @@ func TestTreeNode_Visit(t *testing.T) {
 				qt.Assert(t, tree.Insert(obj), qt.IsNil)
 			}
 			set := sets.New[string]()
-			err := tree.Visit(v(set), tt.options...)
-			qt.Assert(t, err, qt.IsNil)
+			qt.Assert(t, tree.Visit(v(set), tt.options...), qt.IsNil)
 			qt.Assert(t, set, qt.Not(qt.HasLen), 0)
 			qt.Assert(t, set.Difference(tt.want), qt.HasLen, 0)
 		})
@@ -92,22 +87,20 @@ func TestTreeNode_Visit(t *testing.T) {
 
 func TestTreeNode_Pop(t *testing.T) {
 	tests := map[string]struct {
-		initObjs []*unstructured.Unstructured
+		initObjs []*Object
 		// want is a list of names that were matched on
 		want Key
 	}{
 		"PopItem": {
-			initObjs: []*unstructured.Unstructured{
-				{
-					Object: map[string]any{
-						"apiVersion": "v1",
-						"kind":       "Pod",
-						"metadata": map[string]any{
-							"name":      "p1",
-							"namespace": "n1",
-						},
+			initObjs: []*Object{
+				Unstructured(map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "p1",
+						"namespace": "n1",
 					},
-				},
+				}),
 			},
 			want: Key{
 				Name:         "p1",

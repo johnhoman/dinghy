@@ -1,45 +1,86 @@
 package mutate
 
 import (
+	_ "embed"
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
 	"strings"
 
 	"github.com/johnhoman/dinghy/internal/resource"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
+
+var (
+	_ Mutator          = &Labels{}
+	_ Mutator          = &MatchLabels{}
+	_ yaml.Unmarshaler = &MatchLabels{}
 )
 
 // Labels mutates the labels on a resource and any selectors that may
 // reference that label
 type Labels map[string]string
 
+func (l *Labels) Name() string {
+	return "builtin.dinghy.dev/metadata/labels"
+}
+
 // Visit sets the prefix and suffix on the metadata.name attribute
 // of provided object.
-func (l *Labels) Visit(obj *unstructured.Unstructured) error {
-	labels := obj.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-	for key, value := range *l {
-		labels[key] = value
-	}
-	obj.SetLabels(labels)
+func (l *Labels) Visit(obj *resource.Object) error {
+	obj.AddLabels(*l)
 	return nil
 }
 
-// SideEffect searches for resource in the tree that might reference the mutated
-// resource by name, such as a deployment referencing a configmap. If a ConfigMap
-// name is changed, any Deployments, StatefulSets, pods, DaemonSets, ..., etc that
-// reference it will also need to change the reference name
-func (l *Labels) SideEffect(old *unstructured.Unstructured, tree resource.Tree) error {
+// MatchLabels get applied to all resources, but in some cases also
+// make changes to the resource spec, such as matchLabels in a deployment,
+// or service labels in a selector.
+type MatchLabels struct {
+	m map[string]string
+}
+
+func (l *MatchLabels) Name() string {
+	return "builtin.dinghy.dev/matchLabels"
+}
+
+func (l *MatchLabels) UnmarshalYAML(value *yaml.Node) error {
+	return value.Decode(&l.m)
+}
+
+func (l *MatchLabels) Visit(obj *resource.Object) error {
+	obj.AddLabels(l.m)
+	key := obj.GroupVersionKind().GroupKind().String()
+	paths, ok := labelRefs[key]
+	if !ok {
+		return nil
+	}
+	for lk, lv := range l.m {
+		for _, path := range paths {
+			current := obj.Object
+			parts := strings.Split(path, "/")
+			for k, part := range parts {
+				next, ok := current[part]
+				if !ok {
+					current[part] = make(map[string]any)
+					next = current[part]
+				}
+				current, ok = next.(map[string]any)
+				if !ok {
+					return errors.Errorf("expected field to be a mapping, but got %T: %s",
+						next, strings.Join(parts[:k+1], "."))
+				}
+			}
+			current[lk] = lv
+		}
+	}
 	return nil
 }
 
-type deepSet struct {
+type deepSetNameRef struct {
 	to      string
 	from    string
 	refSpec map[string][]string
 }
 
-func (ds *deepSet) setValue(obj map[string]any, path ...string) {
+func (ds *deepSetNameRef) setValue(obj map[string]any, path ...string) {
 	if len(path) == 0 {
 		panic("BUG: this should never get here")
 	}
@@ -60,7 +101,7 @@ func (ds *deepSet) setValue(obj map[string]any, path ...string) {
 	}
 }
 
-func (ds *deepSet) Visit(obj *unstructured.Unstructured) error {
+func (ds *deepSetNameRef) Visit(obj *resource.Object) error {
 	gk := obj.GroupVersionKind().GroupKind().String()
 	paths, ok := ds.refSpec[gk]
 	if !ok {
@@ -74,6 +115,20 @@ func (ds *deepSet) Visit(obj *unstructured.Unstructured) error {
 	return nil
 }
 
-func newDeepSet(to, from string, refSpec map[string][]string) *deepSet {
-	return &deepSet{from: from, to: to, refSpec: refSpec}
+func newDeepSet(to, from string, refSpec map[string][]string) *deepSetNameRef {
+	return &deepSetNameRef{from: from, to: to, refSpec: refSpec}
+}
+
+var (
+	//go:embed labels.yaml
+	labelRefContent []byte
+	labelRefs       map[string][]string
+)
+
+func init() {
+	labelRefs = make(map[string][]string)
+	err := yaml.Unmarshal(labelRefContent, &labelRefs)
+	if err != nil {
+		panic("failed to decode label refs")
+	}
 }
