@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/alecthomas/kong v0.7.1
 	github.com/dop251/goja v0.0.0-20230605162241-28ee0ee714f3
-	github.com/evanphx/json-patch v4.12.0+incompatible
+	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/frankban/quicktest v1.14.5
 	github.com/google/go-cmp v0.5.9
 	github.com/imdario/mergo v0.3.6
