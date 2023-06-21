@@ -3,7 +3,6 @@ module github.com/johnhoman/dinghy
 go 1.20
 
 require (
-	github.com/alecthomas/jsonschema v0.0.0-20220216202328-9eeeec9d044b
 	github.com/alecthomas/kong v0.7.1
 	github.com/dop251/goja v0.0.0-20230605162241-28ee0ee714f3
 	github.com/evanphx/json-patch v4.12.0+incompatible
@@ -14,9 +13,9 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/afero v1.9.5
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.27.2
-	k8s.io/apimachinery v0.27.2
-	k8s.io/client-go v0.27.2
+	k8s.io/api v0.27.3
+	k8s.io/apimachinery v0.27.3
+	k8s.io/client-go v0.27.3
 	sigs.k8s.io/kustomize/api v0.13.4
 )
 
